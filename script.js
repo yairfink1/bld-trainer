@@ -23,7 +23,8 @@ let appData = {
     fullBldTimes:      [],
     fullBldExecTimes:  [],
     fullRegularTimes:  [],
-    fullOhTimes:       []
+    fullOhTimes:       [],
+    deletedIds:        []  // tombstones — IDs of deleted/reset entries
 };
 
 function initDefaults(letters, timesObj, activeObj) {
@@ -53,6 +54,7 @@ function loadData() {
         appData.fullBldExecTimes = p.fullBldExecTimes  || [];
         appData.fullRegularTimes = p.fullRegularTimes  || [];
         appData.fullOhTimes      = p.fullOhTimes       || [];
+        appData.deletedIds       = p.deletedIds        || [];
     }
     // Migration for the new mode naming if needed
     if (localStorage.getItem('bldTrainerData')) {
@@ -139,19 +141,33 @@ function saveDataLocal() {
 // ============================================================
 //  MERGE REMOTE DATA
 // ============================================================
+
+// Helper: add IDs from an array to the tombstone list
+function tombstone(arr) {
+    if (!arr) return;
+    arr.forEach(e => { if (e && e.id) appData.deletedIds.push(e.id); });
+}
+
 function mergeArr(local, remote) {
-    const localIds = new Set(local.map(e => e.id));
-    const merged = [...local];
+    const deleted = new Set(appData.deletedIds);
+    // Filter out any local entries that have been tombstoned remotely
+    const filteredLocal = local.filter(e => !deleted.has(e.id));
+    const localIds = new Set(filteredLocal.map(e => e.id));
+    const merged = [...filteredLocal];
     remote.forEach(e => {
-        if (!localIds.has(e.id)) merged.push(e);
+        // Only add remote entry if it's not tombstoned and not already present
+        if (!deleted.has(e.id) && !localIds.has(e.id)) merged.push(e);
     });
-    // Sort chronologically by id (which starts with Date.now().toString(36))
     merged.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     return merged;
 }
 
 function mergeRemoteData(remote) {
-    if (!remote) return;
+    // Merge tombstones first so they take effect during array merges
+    if (remote.deletedIds?.length) {
+        const existing = new Set(appData.deletedIds);
+        remote.deletedIds.forEach(id => { if (!existing.has(id)) appData.deletedIds.push(id); });
+    }
     // Alg times
     EDGE_LETTERS.forEach(l => {
         if (remote.edgeTimes?.[l]) {
@@ -492,13 +508,27 @@ document.querySelectorAll('[data-reset]').forEach(btn => {
         }[type];
         if (!confirm(msg)) return;
         switch (type) {
-            case 'edge':   EDGE_LETTERS.forEach(l => { appData.edgeTimes[l] = []; }); appData.edgeHistory = []; break;
-            case 'corner': CORNER_LETTERS.forEach(l => { appData.cornerTimes[l] = []; }); appData.cornerHistory = []; break;
-            case 'fullEdge':   appData.fullEdgeTimes = []; appData.fullEdgeExecTimes = []; break;
-            case 'fullCorner': appData.fullCornerTimes = []; appData.fullCornerExecTimes = []; break;
-            case 'fullBld':    
-                appData.fullBldTimes = []; appData.fullBldExecTimes = []; 
-                appData.fullRegularTimes = []; appData.fullOhTimes = []; 
+            case 'edge':
+                EDGE_LETTERS.forEach(l => { tombstone(appData.edgeTimes[l]); appData.edgeTimes[l] = []; });
+                tombstone(appData.edgeHistory); appData.edgeHistory = [];
+                break;
+            case 'corner':
+                CORNER_LETTERS.forEach(l => { tombstone(appData.cornerTimes[l]); appData.cornerTimes[l] = []; });
+                tombstone(appData.cornerHistory); appData.cornerHistory = [];
+                break;
+            case 'fullEdge':
+                tombstone(appData.fullEdgeTimes); appData.fullEdgeTimes = [];
+                tombstone(appData.fullEdgeExecTimes); appData.fullEdgeExecTimes = [];
+                break;
+            case 'fullCorner':
+                tombstone(appData.fullCornerTimes); appData.fullCornerTimes = [];
+                tombstone(appData.fullCornerExecTimes); appData.fullCornerExecTimes = [];
+                break;
+            case 'fullBld':
+                tombstone(appData.fullBldTimes); appData.fullBldTimes = [];
+                tombstone(appData.fullBldExecTimes); appData.fullBldExecTimes = [];
+                tombstone(appData.fullRegularTimes); appData.fullRegularTimes = [];
+                tombstone(appData.fullOhTimes); appData.fullOhTimes = [];
                 break;
         }
         saveData();
@@ -611,7 +641,7 @@ document.getElementById('mode-toggle-bld').addEventListener('change', renderAll)
 //  RENDER FULL SOLVE STATS (shared)
 // ============================================================
 function renderFsStats(timesArr, prefix, listId) {
-    const times = timesArr.map(e => e.time);
+    const times = timesArr.map(tv);
     document.getElementById(prefix + '-best').textContent  = calcBest(times);
     document.getElementById(prefix + '-ao5').textContent   = calcAoN(times, 5);
     document.getElementById(prefix + '-ao12').textContent  = calcAoN(times, 12);
@@ -633,13 +663,14 @@ function renderFsStats(timesArr, prefix, listId) {
 
         const left = document.createElement('span');
         left.style.display = 'flex'; left.style.alignItems = 'center'; left.style.gap = '0.5rem';
-        const ts = document.createElement('span'); ts.textContent = fmt(solve.time);
+        const ts = document.createElement('span'); ts.textContent = fmt(tv(solve));
         const meta = document.createElement('span');
         meta.className = 'solve-meta'; meta.textContent = solve.sequence || '';
         left.appendChild(ts); left.appendChild(meta);
 
         li.appendChild(left);
         li.appendChild(makeDelBtn(() => {
+            if (solve.id) appData.deletedIds.push(solve.id);
             timesArr.splice(realIdx, 1);
             saveData();
         }));
@@ -744,9 +775,14 @@ function renderModalTimes() {
             info.appendChild(document.createTextNode(fmt(tv(entry))));
             li.appendChild(info);
             li.appendChild(makeDelBtn(() => {
+                if (entry.id) appData.deletedIds.push(entry.id);
                 histArr.splice(realIdx, 1);
                 const letterIdx = histArr.slice(0, realIdx).filter(e => e.letter === entry.letter).length;
-                if (timesObj[entry.letter]?.[letterIdx] !== undefined) timesObj[entry.letter].splice(letterIdx, 1);
+                if (timesObj[entry.letter]?.[letterIdx] !== undefined) {
+                    const removed = timesObj[entry.letter].splice(letterIdx, 1);
+                    // Also tombstone the corresponding time entry
+                    if (removed[0]?.id) appData.deletedIds.push(removed[0].id);
+                }
                 saveData(); renderModalTimes();
             }));
             modalTimesList.appendChild(li);
@@ -766,11 +802,16 @@ function renderModalTimes() {
         const li = document.createElement('li');
         li.textContent = fmt(tv(t));
         li.appendChild(makeDelBtn(() => {
+            if (t.id) appData.deletedIds.push(t.id);
             timesObj[sel].splice(realIdx, 1);
             let seen = 0;
             for (let i = 0; i < histArr.length; i++) {
                 if (histArr[i].letter === sel) {
-                    if (seen === realIdx) { histArr.splice(i, 1); break; }
+                    if (seen === realIdx) {
+                        if (histArr[i].id) appData.deletedIds.push(histArr[i].id);
+                        histArr.splice(i, 1);
+                        break;
+                    }
                     seen++;
                 }
             }
