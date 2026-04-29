@@ -416,9 +416,11 @@ function nextEdgeTarget() {
     const mode = document.getElementById('practice-mode-edge').value;
     if (mode === 'slowest') {
         const sorted = [...active].sort((a,b) => {
-            const mA = appData.edgeTimes[a].length ? appData.edgeTimes[a].reduce((x,y)=>x+y,0)/appData.edgeTimes[a].length : 9e9;
-            const mB = appData.edgeTimes[b].length ? appData.edgeTimes[b].reduce((x,y)=>x+y,0)/appData.edgeTimes[b].length : 9e9;
-            return mB - mA;
+            const sumA = appData.edgeTimes[a].reduce((acc, val) => acc + tv(val), 0);
+            const mA = appData.edgeTimes[a].length ? sumA / appData.edgeTimes[a].length : 9e9;
+            const sumB = appData.edgeTimes[b].reduce((acc, val) => acc + tv(val), 0);
+            const mB = appData.edgeTimes[b].length ? sumB / appData.edgeTimes[b].length : 9e9;
+            return mB - mA; // Slower (larger mA) comes first
         });
         const pool = sorted.slice(0, Math.min(3, sorted.length));
         edgeLetter = pool[Math.floor(Math.random() * pool.length)];
@@ -438,8 +440,10 @@ function nextCornerTarget() {
     const mode = document.getElementById('practice-mode-corner').value;
     if (mode === 'slowest') {
         const sorted = [...active].sort((a,b) => {
-            const mA = appData.cornerTimes[a].length ? appData.cornerTimes[a].reduce((x,y)=>x+y,0)/appData.cornerTimes[a].length : 9e9;
-            const mB = appData.cornerTimes[b].length ? appData.cornerTimes[b].reduce((x,y)=>x+y,0)/appData.cornerTimes[b].length : 9e9;
+            const sumA = appData.cornerTimes[a].reduce((acc, val) => acc + tv(val), 0);
+            const mA = appData.cornerTimes[a].length ? sumA / appData.cornerTimes[a].length : 9e9;
+            const sumB = appData.cornerTimes[b].reduce((acc, val) => acc + tv(val), 0);
+            const mB = appData.cornerTimes[b].length ? sumB / appData.cornerTimes[b].length : 9e9;
             return mB - mA;
         });
         const pool = sorted.slice(0, Math.min(3, sorted.length));
