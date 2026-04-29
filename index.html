@@ -20,6 +20,8 @@
         <header>
             <h1>BLD Trainer</h1>
             <div class="controls">
+                <span id="sync-indicator" class="sync-dot" title="Sync disabled"></span>
+                <button id="btn-sync-settings" class="btn secondary">&#9881; Sync</button>
                 <button id="btn-manage-times" class="btn secondary">Manage Times</button>
                 <button id="btn-delete-last" class="btn secondary">Delete Last (Alt+Z)</button>
             </div>
@@ -272,7 +274,41 @@
         </div>
     </div>
 
-    <script src="min2phase.js"></script>
+    <!-- Sync Settings Modal -->
+    <div id="sync-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>&#9881; Cloud Sync</h2>
+                <button id="btn-close-sync" class="btn secondary">Close</button>
+            </div>
+            <div class="modal-body">
+                <!-- Not connected -->
+                <div id="sync-setup">
+                    <p style="margin-bottom:0.75rem;color:var(--text-secondary)">Sync your times across devices using a free GitHub Gist. Your data stays on GitHub — no third-party service.</p>
+                    <ol style="padding-left:1.25rem;color:var(--text-secondary);font-size:0.9rem;line-height:2">
+                        <li>Go to <a href="https://github.com/settings/tokens/new?scopes=gist&description=BLD+Trainer" target="_blank" style="color:var(--accent)">GitHub → New Token</a></li>
+                        <li>Name it <strong>BLD Trainer</strong>, check only the <strong>gist</strong> scope</li>
+                        <li>Copy the token and paste below</li>
+                    </ol>
+                    <input type="password" id="sync-token-input" placeholder="Paste GitHub token here..." autocomplete="off">
+                    <button id="btn-connect-sync" class="btn primary">Connect &amp; Sync</button>
+                    <p id="sync-error" class="sync-error hidden"></p>
+                </div>
+                <!-- Connected -->
+                <div id="sync-connected" class="hidden">
+                    <p style="color:var(--success);font-weight:600;margin-bottom:0.75rem">&#10003; Sync is active</p>
+                    <p class="sync-meta">Gist ID: <code id="sync-gist-id"></code></p>
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:1rem">
+                        <button id="btn-force-push" class="btn secondary">&#8593; Force Push (Local → Cloud)</button>
+                        <button id="btn-force-pull" class="btn secondary">&#8595; Force Pull (Cloud → Local)</button>
+                        <button id="btn-disconnect-sync" class="btn danger">Disconnect Sync</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="sync.js"></script>
     <script src="edges_scrambler.js"></script>
     <script src="script.js"></script>
     <script>

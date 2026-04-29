@@ -78,22 +78,130 @@ function loadData() {
     }
     initDefaults(EDGE_LETTERS, appData.edgeTimes, appData.edgeActive);
     initDefaults(CORNER_LETTERS, appData.cornerTimes, appData.cornerActive);
+    migrateIds(); // Ensure all entries have unique IDs (backwards compatible)
+}
+
+// ============================================================
+//  ID HELPERS
+// ============================================================
+function makeId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// Ensure every entry in a plain-number array gets an id (migration)
+function ensureIds(arr) {
+    return arr.map(e => {
+        if (typeof e === 'number') return { t: e, id: makeId() };
+        if (typeof e === 'object' && !e.id) return { ...e, id: makeId() };
+        return e;
+    });
+}
+
+// Migrate all time arrays after loading
+function migrateIds() {
+    // Alg times: edgeTimes/cornerTimes are objects of arrays of numbers
+    EDGE_LETTERS.forEach(l => {
+        if (appData.edgeTimes[l]) {
+            appData.edgeTimes[l] = ensureIds(appData.edgeTimes[l]);
+        }
+    });
+    CORNER_LETTERS.forEach(l => {
+        if (appData.cornerTimes[l]) {
+            appData.cornerTimes[l] = ensureIds(appData.cornerTimes[l]);
+        }
+    });
+    // History arrays
+    appData.edgeHistory   = ensureIds(appData.edgeHistory);
+    appData.cornerHistory = ensureIds(appData.cornerHistory);
+    // Full solve arrays (already objects, just need id)
+    const fullArrays = [
+        'fullEdgeTimes','fullEdgeExecTimes','fullCornerTimes','fullCornerExecTimes',
+        'fullBldTimes','fullBldExecTimes','fullRegularTimes','fullOhTimes'
+    ];
+    fullArrays.forEach(k => {
+        appData[k] = ensureIds(appData[k]);
+    });
 }
 
 function saveData() {
     localStorage.setItem('bldTrainerData', JSON.stringify(appData));
     renderAll();
+    // Trigger debounced sync push
+    if (typeof pushToGist === 'function') pushToGist(appData);
 }
+
+// Save locally only — used after merging remote data to avoid push loop
+function saveDataLocal() {
+    localStorage.setItem('bldTrainerData', JSON.stringify(appData));
+    renderAll();
+}
+
+// ============================================================
+//  MERGE REMOTE DATA
+// ============================================================
+function mergeArr(local, remote) {
+    const localIds = new Set(local.map(e => e.id));
+    const merged = [...local];
+    remote.forEach(e => {
+        if (!localIds.has(e.id)) merged.push(e);
+    });
+    // Sort chronologically by id (which starts with Date.now().toString(36))
+    merged.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return merged;
+}
+
+function mergeRemoteData(remote) {
+    if (!remote) return;
+    // Alg times
+    EDGE_LETTERS.forEach(l => {
+        if (remote.edgeTimes?.[l]) {
+            const rem = ensureIds(remote.edgeTimes[l]);
+            appData.edgeTimes[l] = mergeArr(appData.edgeTimes[l] || [], rem);
+        }
+    });
+    CORNER_LETTERS.forEach(l => {
+        if (remote.cornerTimes?.[l]) {
+            const rem = ensureIds(remote.cornerTimes[l]);
+            appData.cornerTimes[l] = mergeArr(appData.cornerTimes[l] || [], rem);
+        }
+    });
+    // Algorithms & active (remote wins if local is empty string / default)
+    EDGE_LETTERS.forEach(l => {
+        if (!appData.edgeAlgorithms[l] && remote.edgeAlgorithms?.[l])
+            appData.edgeAlgorithms[l] = remote.edgeAlgorithms[l];
+    });
+    CORNER_LETTERS.forEach(l => {
+        if (!appData.cornerAlgorithms[l] && remote.cornerAlgorithms?.[l])
+            appData.cornerAlgorithms[l] = remote.cornerAlgorithms[l];
+    });
+    // History
+    if (remote.edgeHistory)   appData.edgeHistory   = mergeArr(appData.edgeHistory,   ensureIds(remote.edgeHistory));
+    if (remote.cornerHistory) appData.cornerHistory = mergeArr(appData.cornerHistory, ensureIds(remote.cornerHistory));
+    // Full solve arrays
+    const fullArrays = [
+        'fullEdgeTimes','fullEdgeExecTimes','fullCornerTimes','fullCornerExecTimes',
+        'fullBldTimes','fullBldExecTimes','fullRegularTimes','fullOhTimes'
+    ];
+    fullArrays.forEach(k => {
+        if (remote[k]) appData[k] = mergeArr(appData[k] || [], ensureIds(remote[k]));
+    });
+}
+
+// Expose for sync.js
+window.getAppData     = () => appData;
+window.applyRemoteData = (remote) => { mergeRemoteData(remote); saveDataLocal(); };
 
 // ============================================================
 //  HELPERS
 // ============================================================
 function fmt(ms) { return (ms / 1000).toFixed(2); }
-function calcBest(arr)  { return arr.length ? fmt(Math.min(...arr)) : '—'; }
-function calcMean(arr)  { return arr.length ? fmt(arr.reduce((a,b)=>a+b,0)/arr.length) : '—'; }
+// Extract numeric value from a time entry (supports both raw numbers and {t,id} objects)
+function tv(e) { return typeof e === 'number' ? e : (e.t ?? e.time ?? 0); }
+function calcBest(arr)  { return arr.length ? fmt(Math.min(...arr.map(tv))) : '—'; }
+function calcMean(arr)  { return arr.length ? fmt(arr.map(tv).reduce((a,b)=>a+b,0)/arr.length) : '—'; }
 function calcAoN(arr, n) {
     if (arr.length < n) return '—';
-    const s = arr.slice(-n).sort((a,b)=>a-b);
+    const s = arr.slice(-n).map(tv).sort((a,b)=>a-b);
     const trimmed = s.slice(1, n-1);
     return fmt(trimmed.reduce((a,b)=>a+b,0)/trimmed.length);
 }
@@ -149,8 +257,9 @@ function stopTimer() {
     switch (activeTab) {
         case 'edge-alg':
             if (edgeLetter !== '?') {
-                appData.edgeTimes[edgeLetter].push(currentTime);
-                appData.edgeHistory.push({ letter: edgeLetter, time: currentTime });
+                const entry = { t: currentTime, id: makeId() };
+                appData.edgeTimes[edgeLetter].push(entry);
+                appData.edgeHistory.push({ letter: edgeLetter, t: currentTime, id: makeId() });
                 lastEdgeAdded = edgeLetter;
                 saveData();
                 nextEdgeTarget();
@@ -158,8 +267,9 @@ function stopTimer() {
             break;
         case 'corner-alg':
             if (cornerLetter !== '?') {
-                appData.cornerTimes[cornerLetter].push(currentTime);
-                appData.cornerHistory.push({ letter: cornerLetter, time: currentTime });
+                const entry = { t: currentTime, id: makeId() };
+                appData.cornerTimes[cornerLetter].push(entry);
+                appData.cornerHistory.push({ letter: cornerLetter, t: currentTime, id: makeId() });
                 lastCornerAdded = cornerLetter;
                 saveData();
                 nextCornerTarget();
@@ -168,10 +278,10 @@ function stopTimer() {
         case 'full-edges':
             const modeE = document.getElementById('mode-toggle-edge').value;
             if (modeE === 'full') {
-                appData.fullEdgeTimes.push({ time: currentTime, sequence: edgeScramble.join(' ') });
+                appData.fullEdgeTimes.push({ time: currentTime, sequence: edgeScramble.join(' '), id: makeId() });
                 lastFsEdgeAdded = true;
             } else {
-                appData.fullEdgeExecTimes.push({ time: currentTime, sequence: edgeScramble.join(' ') });
+                appData.fullEdgeExecTimes.push({ time: currentTime, sequence: edgeScramble.join(' '), id: makeId() });
                 lastFsEdgeExecAdded = true;
             }
             showFsSequence('edge');
@@ -180,10 +290,10 @@ function stopTimer() {
         case 'full-corners':
             const modeC = document.getElementById('mode-toggle-corner').value;
             if (modeC === 'full') {
-                appData.fullCornerTimes.push({ time: currentTime, sequence: cornerScramble.join(' ') });
+                appData.fullCornerTimes.push({ time: currentTime, sequence: cornerScramble.join(' '), id: makeId() });
                 lastFsCornerAdded = true;
             } else {
-                appData.fullCornerExecTimes.push({ time: currentTime, sequence: cornerScramble.join(' ') });
+                appData.fullCornerExecTimes.push({ time: currentTime, sequence: cornerScramble.join(' '), id: makeId() });
                 lastFsCornerExecAdded = true;
             }
             showFsSequence('corner');
@@ -192,16 +302,16 @@ function stopTimer() {
         case 'full-bld':
             const modeB = document.getElementById('mode-toggle-bld').value;
             if (modeB === 'bld-full') {
-                appData.fullBldTimes.push({ time: currentTime, sequence: bldScramble.join(' ') });
+                appData.fullBldTimes.push({ time: currentTime, sequence: bldScramble.join(' '), id: makeId() });
                 lastFsBldFullAdded = true;
             } else if (modeB === 'bld-exec') {
-                appData.fullBldExecTimes.push({ time: currentTime, sequence: bldScramble.join(' ') });
+                appData.fullBldExecTimes.push({ time: currentTime, sequence: bldScramble.join(' '), id: makeId() });
                 lastFsBldExecAdded = true;
             } else if (modeB === 'regular') {
-                appData.fullRegularTimes.push({ time: currentTime, sequence: bldScramble.join(' ') });
+                appData.fullRegularTimes.push({ time: currentTime, sequence: bldScramble.join(' '), id: makeId() });
                 lastFsRegularAdded = true;
             } else if (modeB === 'oh') {
-                appData.fullOhTimes.push({ time: currentTime, sequence: bldScramble.join(' ') });
+                appData.fullOhTimes.push({ time: currentTime, sequence: bldScramble.join(' '), id: makeId() });
                 lastFsOhAdded = true;
             }
             showFsSequence('bld');
@@ -631,7 +741,7 @@ function renderModalTimes() {
             badge.textContent = entry.letter;
             badge.style.cssText = 'display:inline-block;background:rgba(59,130,246,0.2);color:var(--accent);border:1px solid rgba(59,130,246,0.4);border-radius:0.25rem;padding:0.1rem 0.45rem;margin-right:0.75rem;font-weight:700;font-size:1rem;';
             info.appendChild(badge);
-            info.appendChild(document.createTextNode(fmt(entry.time)));
+            info.appendChild(document.createTextNode(fmt(tv(entry))));
             li.appendChild(info);
             li.appendChild(makeDelBtn(() => {
                 histArr.splice(realIdx, 1);
@@ -654,7 +764,7 @@ function renderModalTimes() {
     [...times].reverse().forEach((t, revIdx) => {
         const realIdx = times.length - 1 - revIdx;
         const li = document.createElement('li');
-        li.textContent = fmt(t);
+        li.textContent = fmt(tv(t));
         li.appendChild(makeDelBtn(() => {
             timesObj[sel].splice(realIdx, 1);
             let seen = 0;
@@ -681,12 +791,97 @@ modalTypeSelect.addEventListener('change', () => { populateModalLetters(); rende
 modalLetterSelect.addEventListener('change', renderModalTimes);
 
 // ============================================================
+//  SYNC MODAL UI
+// ============================================================
+const syncModal = document.getElementById('sync-modal');
+
+function refreshSyncModal() {
+    const connected = isSyncEnabled();
+    document.getElementById('sync-setup').classList.toggle('hidden', connected);
+    document.getElementById('sync-connected').classList.toggle('hidden', !connected);
+    if (connected) {
+        document.getElementById('sync-gist-id').textContent = getSyncGistId() || '—';
+    }
+}
+
+document.getElementById('btn-sync-settings').addEventListener('click', () => {
+    refreshSyncModal();
+    syncModal.classList.remove('hidden');
+});
+document.getElementById('btn-close-sync').addEventListener('click', () => syncModal.classList.add('hidden'));
+
+// Connect
+document.getElementById('btn-connect-sync').addEventListener('click', async () => {
+    const token = document.getElementById('sync-token-input').value;
+    const errEl = document.getElementById('sync-error');
+    const btn   = document.getElementById('btn-connect-sync');
+    errEl.classList.add('hidden');
+    btn.disabled = true; btn.textContent = 'Connecting…';
+    const result = await setupSync(token);
+    btn.disabled = false; btn.textContent = 'Connect & Sync';
+    if (!result.success) {
+        errEl.textContent = result.error;
+        errEl.classList.remove('hidden');
+        return;
+    }
+    // After connecting, pull remote and merge
+    updateSyncIndicator('syncing');
+    const remote = await pullFromGist();
+    if (remote) { mergeRemoteData(remote); saveDataLocal(); }
+    // Push local data up (in case remote was empty / new gist)
+    await forcePushToGist(appData);
+    updateSyncIndicator('synced');
+    refreshSyncModal();
+});
+
+// Force push
+document.getElementById('btn-force-push').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-force-push');
+    btn.disabled = true; btn.textContent = 'Pushing…';
+    await forcePushToGist(appData);
+    btn.disabled = false; btn.textContent = '↑ Force Push (Local → Cloud)';
+});
+
+// Force pull
+document.getElementById('btn-force-pull').addEventListener('click', async () => {
+    if (!confirm('Pull from cloud and merge into local data? This will add any missing times from the cloud.')) return;
+    const btn = document.getElementById('btn-force-pull');
+    btn.disabled = true; btn.textContent = 'Pulling…';
+    const remote = await pullFromGist();
+    if (remote) { mergeRemoteData(remote); saveDataLocal(); }
+    btn.disabled = false; btn.textContent = '↓ Force Pull (Cloud → Local)';
+});
+
+// Disconnect
+document.getElementById('btn-disconnect-sync').addEventListener('click', () => {
+    if (!confirm('Disconnect sync? Your local data will not be deleted.')) return;
+    disconnectSync();
+    refreshSyncModal();
+});
+
+// ============================================================
 //  INIT
 // ============================================================
 loadData();
 renderAll();
 nextEdgeTarget();
 nextCornerTarget();
+
+// Init sync indicator + pull on startup
+if (typeof isSyncEnabled === 'function') {
+    if (isSyncEnabled()) {
+        updateSyncIndicator('syncing');
+        pullFromGist().then(remote => {
+            if (remote) {
+                mergeRemoteData(remote);
+                saveDataLocal();
+            }
+            updateSyncIndicator('synced');
+        }).catch(() => updateSyncIndicator('error'));
+    } else {
+        updateSyncIndicator('');
+    }
+}
 
 // Init scrambler
 if (window.initScrambler) {
