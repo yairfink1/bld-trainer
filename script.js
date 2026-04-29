@@ -204,8 +204,14 @@ function mergeRemoteData(remote) {
 }
 
 // Expose for sync.js
-window.getAppData     = () => appData;
-window.applyRemoteData = (remote) => { mergeRemoteData(remote); saveDataLocal(); };
+window.getAppData      = () => appData;
+window.applyRemoteData  = (remote) => { mergeRemoteData(remote); saveDataLocal(); };
+window.replaceRemoteData = (remote) => { 
+    if (!remote) return;
+    appData = remote; 
+    migrateIds(); // ensure any raw data is formatted
+    saveDataLocal(); 
+};
 
 // ============================================================
 //  HELPERS
@@ -909,11 +915,14 @@ document.getElementById('btn-force-push').addEventListener('click', async () => 
 
 // Force pull
 document.getElementById('btn-force-pull').addEventListener('click', async () => {
-    if (!confirm('Pull from cloud and merge into local data? This will add any missing times from the cloud.')) return;
+    if (!confirm('WARNING: This will DELETE your local data and replace it EXACTLY with what is in the cloud. Continue?')) return;
     const btn = document.getElementById('btn-force-pull');
-    btn.disabled = true; btn.textContent = 'Pulling…';
+    btn.disabled = true; btn.textContent = 'Overwriting…';
     const remote = await pullFromGist();
-    if (remote) { mergeRemoteData(remote); saveDataLocal(); }
+    if (remote) { 
+        if (window.replaceRemoteData) window.replaceRemoteData(remote);
+        else { mergeRemoteData(remote); saveDataLocal(); }
+    }
     btn.disabled = false; btn.textContent = '↓ Force Pull (Cloud → Local)';
 });
 
