@@ -16,7 +16,7 @@ let _isDirty = false;
 let _lastAppData = null;
 
 // ---- Indicator state ----
-function updateSyncIndicator(state) {
+function updateSyncIndicator(state, extra = '') {
     const dot = document.getElementById('sync-indicator');
     if (!dot) return;
     dot.className = 'sync-dot ' + (state || '');
@@ -25,7 +25,7 @@ function updateSyncIndicator(state) {
         synced:    'Synced ✓',
         syncing:   'Syncing…',
         pending:   'Changes pending sync...',
-        error:     'Sync error — check connection or rate limits',
+        error:     'Sync error ' + extra + ' — check connection or rate limits',
         conflict:  'Merge conflict resolved',
     };
     dot.title = labels[state] || state;
@@ -157,10 +157,10 @@ async function _doPush(appData, isUnloading = false) {
             _isDirty = false;
             if (!isUnloading) updateSyncIndicator('synced');
         } else {
-            if (!isUnloading) updateSyncIndicator('error');
+            if (!isUnloading) updateSyncIndicator('error', `(${r.status})`);
         }
     } catch (e) {
-        if (!isUnloading) updateSyncIndicator('error');
+        if (!isUnloading) updateSyncIndicator('error', '(Network)');
     }
 }
 
