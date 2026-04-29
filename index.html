@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BLD Trainer">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-512.png">
+    <title>BLD Trainer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>BLD Trainer</h1>
+            <div class="controls">
+                <button id="btn-manage-times" class="btn secondary">Manage Times</button>
+                <button id="btn-delete-last" class="btn secondary">Delete Last (Alt+Z)</button>
+            </div>
+        </header>
+
+        <!-- Mode Tabs -->
+        <div class="mode-tabs">
+            <button class="tab-btn active" data-tab="edge-alg">Edge Algs</button>
+            <button class="tab-btn" data-tab="corner-alg">Corner Algs</button>
+            <button class="tab-btn" data-tab="full-edges">Full Edges</button>
+            <button class="tab-btn" data-tab="full-corners">Full Corners</button>
+            <button class="tab-btn" data-tab="full-bld">Full</button>
+        </div>
+
+        <!-- ===== EDGE ALGS ===== -->
+        <div id="view-edge-alg" class="tab-view">
+            <div class="sub-controls">
+                <label for="practice-mode-edge">Mode:</label>
+                <select id="practice-mode-edge">
+                    <option value="random">Random</option>
+                    <option value="slowest">Slowest First</option>
+                </select>
+            </div>
+            <main class="trainer-area">
+                <div class="target-display">
+                    <span id="target-letter-edge">?</span>
+                </div>
+                <div class="timer-display">
+                    <span id="timer-edge">0.00</span>
+                </div>
+                <div class="hints-area">
+                    <p id="hint-text-edge" class="hint-text hidden"></p>
+                    <small class="desktop-hint">Hold Space → release to start → any key to stop. → for hint.</small>
+                    <small class="mobile-hint">Hold timer → release to start → tap to stop.</small>
+                    <button id="btn-hint-edge" class="btn secondary mobile-hint" style="font-size:0.8rem;padding:0.3rem 0.8rem">Show Hint</button>
+                </div>
+            </main>
+            <section class="statistics-section">
+                <div class="section-header">
+                    <h2>Edge Alg Stats</h2>
+                    <button class="btn danger" data-reset="edge">Reset Edge Stats</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Active</th><th>Letter</th><th>Algorithm</th><th>Best</th><th>Ao5</th><th>Mean</th><th>Count</th></tr>
+                        </thead>
+                        <tbody id="stats-body-edge"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ===== CORNER ALGS ===== -->
+        <div id="view-corner-alg" class="tab-view view-hidden">
+            <div class="sub-controls">
+                <label for="practice-mode-corner">Mode:</label>
+                <select id="practice-mode-corner">
+                    <option value="random">Random</option>
+                    <option value="slowest">Slowest First</option>
+                </select>
+            </div>
+            <main class="trainer-area">
+                <div class="target-display">
+                    <span id="target-letter-corner">?</span>
+                </div>
+                <div class="timer-display">
+                    <span id="timer-corner">0.00</span>
+                </div>
+                <div class="hints-area">
+                    <p id="hint-text-corner" class="hint-text hidden"></p>
+                    <small class="desktop-hint">Hold Space → release to start → any key to stop. → for hint.</small>
+                    <small class="mobile-hint">Hold timer → release to start → tap to stop.</small>
+                    <button id="btn-hint-corner" class="btn secondary mobile-hint" style="font-size:0.8rem;padding:0.3rem 0.8rem">Show Hint</button>
+                </div>
+            </main>
+            <section class="statistics-section">
+                <div class="section-header">
+                    <h2>Corner Alg Stats</h2>
+                    <button class="btn danger" data-reset="corner">Reset Corner Stats</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Active</th><th>Letter</th><th>Algorithm</th><th>Best</th><th>Ao5</th><th>Mean</th><th>Count</th></tr>
+                        </thead>
+                        <tbody id="stats-body-corner"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ===== FULL EDGES ===== -->
+        <div id="view-full-edges" class="tab-view view-hidden">
+            <div class="sub-controls">
+                <select id="mode-toggle-edge">
+                    <option value="full">Full Solve</option>
+                    <option value="exec">Execution</option>
+                </select>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="hide-on-start-edge" checked>
+                    Hide scramble on start
+                </label>
+                <button id="btn-new-scramble-edge" class="btn secondary">New Scramble ⟳</button>
+            </div>
+            <main class="trainer-area fs-trainer-area">
+                <div class="fs-sequence-wrap">
+                    <div id="fs-sequence-edge" class="fs-scramble-display"></div>
+                    <p id="fs-loading-edge" class="fs-msg">⏳ Initialising scramble engine...</p>
+                    <p id="fs-hidden-edge" class="fs-msg hidden">Scramble hidden — execute from memory!</p>
+                </div>
+                <div class="timer-display">
+                    <span id="fs-timer-edge">0.00</span>
+                </div>
+                <div class="hints-area">
+                    <small class="desktop-hint">Apply scramble → memo → Hold Space → release → any key to stop.</small>
+                    <small class="mobile-hint">Apply scramble → memo → Hold timer → release → tap to stop.</small>
+                </div>
+            </main>
+            <section class="statistics-section">
+                <div class="section-header">
+                    <h2>Full Edge Solve Times</h2>
+                    <button class="btn danger" data-reset="fullEdge">Reset</button>
+                </div>
+                <div class="fs-stats-grid">
+                    <div class="fs-stat-card"><div class="fs-stat-label">Best</div><div class="fs-stat-val" id="fse-best">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Ao5</div><div class="fs-stat-val" id="fse-ao5">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Ao12</div><div class="fs-stat-val" id="fse-ao12">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Mean</div><div class="fs-stat-val" id="fse-mean">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Count</div><div class="fs-stat-val" id="fse-count">0</div></div>
+                </div>
+                <ul id="fse-times-list" class="times-list fs-times-list"></ul>
+            </section>
+        </div>
+
+        <!-- ===== FULL CORNERS ===== -->
+        <div id="view-full-corners" class="tab-view view-hidden">
+            <div class="sub-controls">
+                <select id="mode-toggle-corner">
+                    <option value="full">Full Solve</option>
+                    <option value="exec">Execution</option>
+                </select>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="hide-on-start-corner" checked>
+                    Hide scramble on start
+                </label>
+                <button id="btn-new-scramble-corner" class="btn secondary">New Scramble ⟳</button>
+            </div>
+            <main class="trainer-area fs-trainer-area">
+                <div class="fs-sequence-wrap">
+                    <div id="fs-sequence-corner" class="fs-scramble-display"></div>
+                    <p id="fs-loading-corner" class="fs-msg">⏳ Initialising scramble engine...</p>
+                    <p id="fs-hidden-corner" class="fs-msg hidden">Scramble hidden — execute from memory!</p>
+                </div>
+                <div class="timer-display">
+                    <span id="fs-timer-corner">0.00</span>
+                </div>
+                <div class="hints-area">
+                    <small class="desktop-hint">Apply scramble → memo → Hold Space → release → any key to stop.</small>
+                    <small class="mobile-hint">Apply scramble → memo → Hold timer → release → tap to stop.</small>
+                </div>
+            </main>
+            <section class="statistics-section">
+                <div class="section-header">
+                    <h2>Full Corner Solve Times</h2>
+                    <button class="btn danger" data-reset="fullCorner">Reset</button>
+                </div>
+                <div class="fs-stats-grid">
+                    <div class="fs-stat-card"><div class="fs-stat-label">Best</div><div class="fs-stat-val" id="fsc-best">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Ao5</div><div class="fs-stat-val" id="fsc-ao5">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Ao12</div><div class="fs-stat-val" id="fsc-ao12">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Mean</div><div class="fs-stat-val" id="fsc-mean">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Count</div><div class="fs-stat-val" id="fsc-count">0</div></div>
+                </div>
+                <ul id="fsc-times-list" class="times-list fs-times-list"></ul>
+            </section>
+        </div>
+
+        <!-- ===== FULL BLD ===== -->
+        <div id="view-full-bld" class="tab-view view-hidden">
+            <div class="sub-controls">
+                <select id="mode-toggle-bld">
+                    <option value="bld-full">BLD Full</option>
+                    <option value="bld-exec">BLD Execution</option>
+                    <option value="regular">Regular</option>
+                    <option value="oh">One Handed</option>
+                </select>
+                <label for="scramble-length-bld">Moves:</label>
+                <select id="scramble-length-bld">
+                    <option value="20">20</option>
+                    <option value="25" selected>25 (WCA default)</option>
+                </select>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="hide-on-start-bld" checked>
+                    Hide scramble on start
+                </label>
+                <button id="btn-new-scramble-bld" class="btn secondary">New Scramble ⟳</button>
+            </div>
+            <main class="trainer-area fs-trainer-area">
+                <div class="fs-sequence-wrap">
+                    <div id="fs-sequence-bld" class="fs-scramble-display"></div>
+                    <p id="fs-hidden-bld" class="fs-msg hidden">Scramble hidden — memo &amp; execute!</p>
+                </div>
+                <div class="timer-display">
+                    <span id="fs-timer-bld">0.00</span>
+                </div>
+                <div class="hints-area">
+                    <small class="desktop-hint">Apply scramble → memo → Hold Space → release → any key to stop.</small>
+                    <small class="mobile-hint">Apply scramble → memo → Hold timer → release → tap to stop.</small>
+                </div>
+            </main>
+            <section class="statistics-section">
+                <div class="section-header">
+                    <h2 id="full-stats-heading">Full Times</h2>
+                    <button class="btn danger" data-reset="fullBld">Reset</button>
+                </div>
+                <div class="fs-stats-grid">
+                    <div class="fs-stat-card"><div class="fs-stat-label">Best</div><div class="fs-stat-val" id="fsb-best">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Ao5</div><div class="fs-stat-val" id="fsb-ao5">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Ao12</div><div class="fs-stat-val" id="fsb-ao12">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Mean</div><div class="fs-stat-val" id="fsb-mean">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Count</div><div class="fs-stat-val" id="fsb-count">0</div></div>
+                </div>
+                <ul id="fsb-times-list" class="times-list fs-times-list"></ul>
+            </section>
+        </div>
+
+        </div>
+    </div>
+
+    <!-- Modal for Managing Times -->
+    <div id="times-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Manage Times</h2>
+                <button id="btn-close-modal" class="btn secondary">Close</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-controls">
+                    <label for="modal-type-select">Type:</label>
+                    <select id="modal-type-select">
+                        <option value="edge">Edge Algs</option>
+                        <option value="corner">Corner Algs</option>
+                    </select>
+                    <label for="modal-letter-select">Letter:</label>
+                    <select id="modal-letter-select"></select>
+                </div>
+                <ul id="times-list" class="times-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="min2phase.js"></script>
+    <script src="edges_scrambler.js"></script>
+    <script src="script.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>

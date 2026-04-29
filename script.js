@@ -1,0 +1,781 @@
+// ============================================================
+//  LETTER SETS
+// ============================================================
+const EDGE_LETTERS   = ['A','B','C','D','E','F','G','H','I','J','L','M','N','O','P','Q','R','S','T','V','W','X'];
+const CORNER_LETTERS = ['B','C','D','F','G','H','I','J','K','L','M','N','O','P','Q','S','T','U','V','W','X'];
+
+// ============================================================
+//  DATA
+// ============================================================
+let appData = {
+    edgeAlgorithms:    {},
+    edgeTimes:         {},
+    edgeActive:        {},
+    edgeHistory:       [],
+    cornerAlgorithms:  {},
+    cornerTimes:       {},
+    cornerActive:      {},
+    cornerHistory:     [],
+    fullEdgeTimes:     [],
+    fullEdgeExecTimes: [],
+    fullCornerTimes:   [],
+    fullCornerExecTimes: [],
+    fullBldTimes:      [],
+    fullBldExecTimes:  [],
+    fullRegularTimes:  [],
+    fullOhTimes:       []
+};
+
+function initDefaults(letters, timesObj, activeObj) {
+    letters.forEach(l => {
+        if (!timesObj[l]) timesObj[l] = [];
+        if (activeObj[l] === undefined) activeObj[l] = true;
+    });
+}
+
+function loadData() {
+    const saved = localStorage.getItem('bldTrainerData');
+    if (saved) {
+        const p = JSON.parse(saved);
+        appData.edgeAlgorithms   = p.edgeAlgorithms   || {};
+        appData.edgeTimes        = p.edgeTimes         || {};
+        appData.edgeActive       = p.edgeActive        || {};
+        appData.edgeHistory      = p.edgeHistory       || [];
+        appData.cornerAlgorithms = p.cornerAlgorithms  || {};
+        appData.cornerTimes      = p.cornerTimes       || {};
+        appData.cornerActive     = p.cornerActive      || {};
+        appData.cornerHistory    = p.cornerHistory     || [];
+        appData.fullEdgeTimes    = p.fullEdgeTimes     || [];
+        appData.fullEdgeExecTimes= p.fullEdgeExecTimes || [];
+        appData.fullCornerTimes  = p.fullCornerTimes   || [];
+        appData.fullCornerExecTimes= p.fullCornerExecTimes || [];
+        appData.fullBldTimes     = p.fullBldTimes      || [];
+        appData.fullBldExecTimes = p.fullBldExecTimes  || [];
+        appData.fullRegularTimes = p.fullRegularTimes  || [];
+        appData.fullOhTimes      = p.fullOhTimes       || [];
+    }
+    // Migration for the new mode naming if needed
+    if (localStorage.getItem('bldTrainerData')) {
+        const p = JSON.parse(localStorage.getItem('bldTrainerData'));
+        // If they had bld-full or bld-exec data under old names, it's already there
+    }
+    // Migration: if old execTimes exists, put it in fullBldExecTimes
+    if (localStorage.getItem('bldTrainerData')) {
+        const p = JSON.parse(localStorage.getItem('bldTrainerData'));
+        if (p.execTimes && !appData.fullBldExecTimes.length) {
+            appData.fullBldExecTimes = p.execTimes;
+        }
+    }
+    // Migrate old data if present
+    const old = localStorage.getItem('m2TrainerData');
+    if (old && !saved) {
+        const o = JSON.parse(old);
+        appData.edgeAlgorithms = o.algorithms || {};
+        appData.edgeTimes      = o.times      || {};
+        appData.edgeActive     = o.activeLetters || {};
+        appData.edgeHistory    = o.history     || [];
+        appData.fullEdgeTimes  = o.fsTimes     || [];
+    }
+    initDefaults(EDGE_LETTERS, appData.edgeTimes, appData.edgeActive);
+    initDefaults(CORNER_LETTERS, appData.cornerTimes, appData.cornerActive);
+}
+
+function saveData() {
+    localStorage.setItem('bldTrainerData', JSON.stringify(appData));
+    renderAll();
+}
+
+// ============================================================
+//  HELPERS
+// ============================================================
+function fmt(ms) { return (ms / 1000).toFixed(2); }
+function calcBest(arr)  { return arr.length ? fmt(Math.min(...arr)) : '—'; }
+function calcMean(arr)  { return arr.length ? fmt(arr.reduce((a,b)=>a+b,0)/arr.length) : '—'; }
+function calcAoN(arr, n) {
+    if (arr.length < n) return '—';
+    const s = arr.slice(-n).sort((a,b)=>a-b);
+    const trimmed = s.slice(1, n-1);
+    return fmt(trimmed.reduce((a,b)=>a+b,0)/trimmed.length);
+}
+function makeDelBtn(handler) {
+    const b = document.createElement('button');
+    b.className = 'btn-delete-time'; b.innerHTML = '&times;'; b.title = 'Delete';
+    b.addEventListener('click', handler);
+    return b;
+}
+
+// ============================================================
+//  TIMER STATE
+// ============================================================
+const COOLDOWN = 300;
+let timerState = 'IDLE';
+let timerCooldown = false;
+let startTime = 0, currentTime = 0, timerInterval;
+let activeTab = 'edge-alg';
+
+// Per-tab state
+let edgeLetter = '', cornerLetter = '';
+let lastEdgeAdded = null, lastCornerAdded = null;
+let lastFsEdgeAdded = false, lastFsCornerAdded = false, lastFsBldAdded = false;
+let lastFsEdgeExecAdded = false, lastFsCornerExecAdded = false; 
+let lastFsBldFullAdded = false, lastFsBldExecAdded = false, lastFsRegularAdded = false, lastFsOhAdded = false;
+let edgeScramble = [], cornerScramble = [], bldScramble = [];
+let scramblerReady = false;
+
+function getTimerEl() {
+    switch (activeTab) {
+        case 'edge-alg':     return document.getElementById('timer-edge');
+        case 'full-edges':   return document.getElementById('fs-timer-edge');
+        case 'corner-alg':   return document.getElementById('timer-corner');
+        case 'full-corners': return document.getElementById('fs-timer-corner');
+        case 'full-bld':     return document.getElementById('fs-timer-bld');
+    }
+}
+
+function updateTimerDisplay() { getTimerEl().textContent = fmt(currentTime); }
+
+function setTimerColor(state) {
+    const map = { idle: 'var(--timer-running)', primed: 'var(--timer-ready)', running: 'var(--timer-running)' };
+    document.documentElement.style.setProperty('--timer-color', map[state]);
+}
+
+function stopTimer() {
+    timerState = 'IDLE';
+    timerCooldown = true;
+    setTimeout(() => { timerCooldown = false; }, COOLDOWN);
+    clearInterval(timerInterval);
+    setTimerColor('idle');
+
+    switch (activeTab) {
+        case 'edge-alg':
+            if (edgeLetter !== '?') {
+                appData.edgeTimes[edgeLetter].push(currentTime);
+                appData.edgeHistory.push({ letter: edgeLetter, time: currentTime });
+                lastEdgeAdded = edgeLetter;
+                saveData();
+                nextEdgeTarget();
+            }
+            break;
+        case 'corner-alg':
+            if (cornerLetter !== '?') {
+                appData.cornerTimes[cornerLetter].push(currentTime);
+                appData.cornerHistory.push({ letter: cornerLetter, time: currentTime });
+                lastCornerAdded = cornerLetter;
+                saveData();
+                nextCornerTarget();
+            }
+            break;
+        case 'full-edges':
+            const modeE = document.getElementById('mode-toggle-edge').value;
+            if (modeE === 'full') {
+                appData.fullEdgeTimes.push({ time: currentTime, sequence: edgeScramble.join(' ') });
+                lastFsEdgeAdded = true;
+            } else {
+                appData.fullEdgeExecTimes.push({ time: currentTime, sequence: edgeScramble.join(' ') });
+                lastFsEdgeExecAdded = true;
+            }
+            showFsSequence('edge');
+            saveData();
+            break;
+        case 'full-corners':
+            const modeC = document.getElementById('mode-toggle-corner').value;
+            if (modeC === 'full') {
+                appData.fullCornerTimes.push({ time: currentTime, sequence: cornerScramble.join(' ') });
+                lastFsCornerAdded = true;
+            } else {
+                appData.fullCornerExecTimes.push({ time: currentTime, sequence: cornerScramble.join(' ') });
+                lastFsCornerExecAdded = true;
+            }
+            showFsSequence('corner');
+            saveData();
+            break;
+        case 'full-bld':
+            const modeB = document.getElementById('mode-toggle-bld').value;
+            if (modeB === 'bld-full') {
+                appData.fullBldTimes.push({ time: currentTime, sequence: bldScramble.join(' ') });
+                lastFsBldFullAdded = true;
+            } else if (modeB === 'bld-exec') {
+                appData.fullBldExecTimes.push({ time: currentTime, sequence: bldScramble.join(' ') });
+                lastFsBldExecAdded = true;
+            } else if (modeB === 'regular') {
+                appData.fullRegularTimes.push({ time: currentTime, sequence: bldScramble.join(' ') });
+                lastFsRegularAdded = true;
+            } else if (modeB === 'oh') {
+                appData.fullOhTimes.push({ time: currentTime, sequence: bldScramble.join(' ') });
+                lastFsOhAdded = true;
+            }
+            showFsSequence('bld');
+            saveData();
+            break;
+    }
+}
+
+// ============================================================
+//  KEYBOARD
+// ============================================================
+window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+    if (timerState === 'RUNNING') {
+        e.preventDefault();
+        stopTimer();
+        return;
+    }
+
+    if (e.code === 'Space') {
+        e.preventDefault();
+        if (timerState === 'IDLE' && !timerCooldown) {
+            timerState = 'PRIMED';
+            setTimerColor('primed');
+            currentTime = 0;
+            updateTimerDisplay();
+            // Hide scramble if applicable
+            if (activeTab === 'full-edges' && document.getElementById('hide-on-start-edge').checked)
+                hideFsSequence('edge');
+            if (activeTab === 'full-corners' && document.getElementById('hide-on-start-corner').checked)
+                hideFsSequence('corner');
+            if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld').checked)
+                hideFsSequence('bld');
+        }
+    } else if (e.code === 'ArrowRight') {
+        if (activeTab === 'edge-alg' && edgeLetter !== '?') {
+            const h = document.getElementById('hint-text-edge');
+            h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
+            h.classList.remove('hidden');
+        }
+        if (activeTab === 'corner-alg' && cornerLetter !== '?') {
+            const h = document.getElementById('hint-text-corner');
+            h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
+            h.classList.remove('hidden');
+        }
+    } else if (e.code === 'KeyZ' && e.altKey) {
+        deleteLast();
+    }
+});
+
+window.addEventListener('keyup', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space' && timerState === 'PRIMED') {
+        timerState = 'RUNNING';
+        setTimerColor('running');
+        startTime = performance.now();
+        timerInterval = setInterval(() => {
+            currentTime = performance.now() - startTime;
+            updateTimerDisplay();
+        }, 10);
+    }
+});
+
+// ============================================================
+//  SINGLE ALG: EDGES
+// ============================================================
+function nextEdgeTarget() {
+    const active = EDGE_LETTERS.filter(l => appData.edgeActive[l]);
+    if (!active.length) { edgeLetter = '?'; document.getElementById('target-letter-edge').textContent = '?'; return; }
+    const mode = document.getElementById('practice-mode-edge').value;
+    if (mode === 'slowest') {
+        const sorted = [...active].sort((a,b) => {
+            const mA = appData.edgeTimes[a].length ? appData.edgeTimes[a].reduce((x,y)=>x+y,0)/appData.edgeTimes[a].length : 9e9;
+            const mB = appData.edgeTimes[b].length ? appData.edgeTimes[b].reduce((x,y)=>x+y,0)/appData.edgeTimes[b].length : 9e9;
+            return mB - mA;
+        });
+        const pool = sorted.slice(0, Math.min(3, sorted.length));
+        edgeLetter = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+        edgeLetter = active[Math.floor(Math.random() * active.length)];
+    }
+    document.getElementById('target-letter-edge').textContent = edgeLetter;
+    document.getElementById('hint-text-edge').classList.add('hidden');
+}
+
+// ============================================================
+//  SINGLE ALG: CORNERS
+// ============================================================
+function nextCornerTarget() {
+    const active = CORNER_LETTERS.filter(l => appData.cornerActive[l]);
+    if (!active.length) { cornerLetter = '?'; document.getElementById('target-letter-corner').textContent = '?'; return; }
+    const mode = document.getElementById('practice-mode-corner').value;
+    if (mode === 'slowest') {
+        const sorted = [...active].sort((a,b) => {
+            const mA = appData.cornerTimes[a].length ? appData.cornerTimes[a].reduce((x,y)=>x+y,0)/appData.cornerTimes[a].length : 9e9;
+            const mB = appData.cornerTimes[b].length ? appData.cornerTimes[b].reduce((x,y)=>x+y,0)/appData.cornerTimes[b].length : 9e9;
+            return mB - mA;
+        });
+        const pool = sorted.slice(0, Math.min(3, sorted.length));
+        cornerLetter = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+        cornerLetter = active[Math.floor(Math.random() * active.length)];
+    }
+    document.getElementById('target-letter-corner').textContent = cornerLetter;
+    document.getElementById('hint-text-corner').classList.add('hidden');
+}
+
+// ============================================================
+//  DELETE LAST
+// ============================================================
+function deleteLast() {
+    switch (activeTab) {
+        case 'edge-alg':
+            if (lastEdgeAdded && appData.edgeTimes[lastEdgeAdded]?.length) {
+                appData.edgeTimes[lastEdgeAdded].pop();
+                if (appData.edgeHistory.length) appData.edgeHistory.pop();
+                lastEdgeAdded = null;
+                saveData(); currentTime = 0; updateTimerDisplay();
+            }
+            break;
+        case 'corner-alg':
+            if (lastCornerAdded && appData.cornerTimes[lastCornerAdded]?.length) {
+                appData.cornerTimes[lastCornerAdded].pop();
+                if (appData.cornerHistory.length) appData.cornerHistory.pop();
+                lastCornerAdded = null;
+                saveData(); currentTime = 0; updateTimerDisplay();
+            }
+            break;
+        case 'full-edges':
+            const modeE = document.getElementById('mode-toggle-edge').value;
+            if (modeE === 'full' && lastFsEdgeAdded && appData.fullEdgeTimes.length) {
+                appData.fullEdgeTimes.pop(); lastFsEdgeAdded = false;
+            } else if (modeE === 'exec' && lastFsEdgeExecAdded && appData.fullEdgeExecTimes.length) {
+                appData.fullEdgeExecTimes.pop(); lastFsEdgeExecAdded = false;
+            }
+            saveData(); currentTime = 0; updateTimerDisplay();
+            break;
+        case 'full-corners':
+            const modeC = document.getElementById('mode-toggle-corner').value;
+            if (modeC === 'full' && lastFsCornerAdded && appData.fullCornerTimes.length) {
+                appData.fullCornerTimes.pop(); lastFsCornerAdded = false;
+            } else if (modeC === 'exec' && lastFsCornerExecAdded && appData.fullCornerExecTimes.length) {
+                appData.fullCornerExecTimes.pop(); lastFsCornerExecAdded = false;
+            }
+            saveData(); currentTime = 0; updateTimerDisplay();
+            break;
+        case 'full-bld':
+            const modeB = document.getElementById('mode-toggle-bld').value;
+            if (modeB === 'bld-full' && lastFsBldFullAdded && appData.fullBldTimes.length) {
+                appData.fullBldTimes.pop(); lastFsBldFullAdded = false;
+            } else if (modeB === 'bld-exec' && lastFsBldExecAdded && appData.fullBldExecTimes.length) {
+                appData.fullBldExecTimes.pop(); lastFsBldExecAdded = false;
+            } else if (modeB === 'regular' && lastFsRegularAdded && appData.fullRegularTimes.length) {
+                appData.fullRegularTimes.pop(); lastFsRegularAdded = false;
+            } else if (modeB === 'oh' && lastFsOhAdded && appData.fullOhTimes.length) {
+                appData.fullOhTimes.pop(); lastFsOhAdded = false;
+            }
+            saveData(); currentTime = 0; updateTimerDisplay();
+            break;
+    }
+}
+
+document.getElementById('btn-delete-last').addEventListener('click', deleteLast);
+
+// ============================================================
+//  RESET BUTTONS
+// ============================================================
+document.querySelectorAll('[data-reset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const type = btn.dataset.reset;
+        const msg = {
+            edge: 'Delete all edge alg times?',
+            corner: 'Delete all corner alg times?',
+            fullEdge: 'Delete all full edge solve times?',
+            fullCorner: 'Delete all full corner solve times?',
+            fullBld: 'Delete all times in this tab (BLD Full, Exec, Regular, OH)?'
+        }[type];
+        if (!confirm(msg)) return;
+        switch (type) {
+            case 'edge':   EDGE_LETTERS.forEach(l => { appData.edgeTimes[l] = []; }); appData.edgeHistory = []; break;
+            case 'corner': CORNER_LETTERS.forEach(l => { appData.cornerTimes[l] = []; }); appData.cornerHistory = []; break;
+            case 'fullEdge':   appData.fullEdgeTimes = []; appData.fullEdgeExecTimes = []; break;
+            case 'fullCorner': appData.fullCornerTimes = []; appData.fullCornerExecTimes = []; break;
+            case 'fullBld':    
+                appData.fullBldTimes = []; appData.fullBldExecTimes = []; 
+                appData.fullRegularTimes = []; appData.fullOhTimes = []; 
+                break;
+        }
+        saveData();
+    });
+});
+
+// ============================================================
+//  RENDER ALG TABLE (shared for edge & corner)
+// ============================================================
+function renderAlgTable(letters, timesObj, activeObj, algObj, tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    tbody.innerHTML = '';
+    letters.forEach(l => {
+        const tr = document.createElement('tr');
+
+        const tdCb = document.createElement('td');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = activeObj[l];
+        cb.addEventListener('change', () => { activeObj[l] = cb.checked; saveData(); });
+        tdCb.appendChild(cb);
+
+        const tdL = document.createElement('td');
+        tdL.className = 'letter-cell'; tdL.textContent = l;
+
+        const tdA = document.createElement('td');
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.className = 'alg-input'; inp.placeholder = 'Paste algorithm...';
+        inp.value = algObj[l] || '';
+        inp.addEventListener('change', () => { algObj[l] = inp.value; saveData(); });
+        tdA.appendChild(inp);
+
+        const t = timesObj[l] || [];
+        const tdB = document.createElement('td'); tdB.className='stat-val'; tdB.textContent=calcBest(t);
+        const td5 = document.createElement('td'); td5.className='stat-val'; td5.textContent=calcAoN(t,5);
+        const tdM = document.createElement('td'); tdM.className='stat-val'; tdM.textContent=calcMean(t);
+        const tdC = document.createElement('td'); tdC.className='stat-val'; tdC.textContent=t.length;
+
+        [tdCb, tdL, tdA, tdB, td5, tdM, tdC].forEach(td => tr.appendChild(td));
+        tbody.appendChild(tr);
+    });
+}
+
+// ============================================================
+//  FULL SOLVE: SCRAMBLE DISPLAY
+// ============================================================
+function showFsSequence(type) {
+    document.getElementById('fs-sequence-' + type).classList.remove('view-hidden');
+    document.getElementById('fs-hidden-' + type).classList.add('hidden');
+}
+
+function hideFsSequence(type) {
+    document.getElementById('fs-sequence-' + type).classList.add('view-hidden');
+    document.getElementById('fs-hidden-' + type).classList.remove('hidden');
+}
+
+function renderScramble(moves, type) {
+    const el = document.getElementById('fs-sequence-' + type);
+    el.innerHTML = '';
+    moves.forEach(m => {
+        const span = document.createElement('span');
+        span.className = 'move'; span.textContent = m;
+        el.appendChild(span);
+    });
+    showFsSequence(type);
+    document.getElementById('fs-timer-' + type).textContent = '0.00';
+    currentTime = 0;
+}
+
+function newEdgeScramble() {
+    if (timerState === 'RUNNING') return;
+    if (!scramblerReady) return;
+    const s = window.generateEdgesOnlyScramble();
+    edgeScramble = s.split(' ').filter(m => m.length);
+    renderScramble(edgeScramble, 'edge');
+    lastFsEdgeAdded = false;
+}
+
+function newCornerScramble() {
+    if (timerState === 'RUNNING') return;
+    if (!scramblerReady) return;
+    const s = window.generateCornersOnlyScramble();
+    cornerScramble = s.split(' ').filter(m => m.length);
+    renderScramble(cornerScramble, 'corner');
+    lastFsCornerAdded = false;
+}
+
+document.getElementById('btn-new-scramble-edge').addEventListener('click', newEdgeScramble);
+document.getElementById('btn-new-scramble-corner').addEventListener('click', newCornerScramble);
+
+// ---- Full BLD scramble ----
+function newBldScramble() {
+    if (timerState === 'RUNNING') return;
+    const len = parseInt(document.getElementById('scramble-length-bld').value) || 25;
+    const s = window.generateFullScramble(len);
+    bldScramble = s.split(' ').filter(m => m.length);
+    renderScramble(bldScramble, 'bld');
+    lastFsBldAdded = false;
+}
+document.getElementById('btn-new-scramble-bld').addEventListener('click', newBldScramble);
+// Generate immediately (no solver needed)
+newBldScramble();
+
+
+// Toggle listeners
+document.getElementById('mode-toggle-edge').addEventListener('change', renderAll);
+document.getElementById('mode-toggle-corner').addEventListener('change', renderAll);
+document.getElementById('mode-toggle-bld').addEventListener('change', renderAll);
+
+// ============================================================
+//  RENDER FULL SOLVE STATS (shared)
+// ============================================================
+function renderFsStats(timesArr, prefix, listId) {
+    const times = timesArr.map(e => e.time);
+    document.getElementById(prefix + '-best').textContent  = calcBest(times);
+    document.getElementById(prefix + '-ao5').textContent   = calcAoN(times, 5);
+    document.getElementById(prefix + '-ao12').textContent  = calcAoN(times, 12);
+    document.getElementById(prefix + '-mean').textContent  = calcMean(times);
+    document.getElementById(prefix + '-count').textContent = times.length;
+
+    const ul = document.getElementById(listId);
+    ul.innerHTML = '';
+    if (!timesArr.length) {
+        const li = document.createElement('li');
+        li.textContent = 'No solves yet.';
+        li.style.color = 'var(--text-secondary)'; li.style.justifyContent = 'center';
+        ul.appendChild(li);
+        return;
+    }
+    [...timesArr].reverse().forEach((solve, revIdx) => {
+        const realIdx = timesArr.length - 1 - revIdx;
+        const li = document.createElement('li');
+
+        const left = document.createElement('span');
+        left.style.display = 'flex'; left.style.alignItems = 'center'; left.style.gap = '0.5rem';
+        const ts = document.createElement('span'); ts.textContent = fmt(solve.time);
+        const meta = document.createElement('span');
+        meta.className = 'solve-meta'; meta.textContent = solve.sequence || '';
+        left.appendChild(ts); left.appendChild(meta);
+
+        li.appendChild(left);
+        li.appendChild(makeDelBtn(() => {
+            timesArr.splice(realIdx, 1);
+            saveData();
+        }));
+        ul.appendChild(li);
+    });
+}
+
+// ============================================================
+//  RENDER ALL
+// ============================================================
+function renderAll() {
+    renderAlgTable(EDGE_LETTERS, appData.edgeTimes, appData.edgeActive, appData.edgeAlgorithms, 'stats-body-edge');
+    renderAlgTable(CORNER_LETTERS, appData.cornerTimes, appData.cornerActive, appData.cornerAlgorithms, 'stats-body-corner');
+    
+    // Edges
+    const modeE = document.getElementById('mode-toggle-edge').value;
+    renderFsStats(modeE === 'full' ? appData.fullEdgeTimes : appData.fullEdgeExecTimes, 'fse', 'fse-times-list');
+    
+    // Corners
+    const modeC = document.getElementById('mode-toggle-corner').value;
+    renderFsStats(modeC === 'full' ? appData.fullCornerTimes : appData.fullCornerExecTimes, 'fsc', 'fsc-times-list');
+    
+    // Full Tab (Multiple Modes)
+    const modeB = document.getElementById('mode-toggle-bld').value;
+    const bldMap = {
+        'bld-full': { data: appData.fullBldTimes, label: 'BLD Full Times' },
+        'bld-exec': { data: appData.fullBldExecTimes, label: 'BLD Execution Times' },
+        'regular':  { data: appData.fullRegularTimes, label: 'Regular Solve Times' },
+        'oh':       { data: appData.fullOhTimes, label: 'One Handed Times' }
+    };
+    const currentBld = bldMap[modeB];
+    document.getElementById('full-stats-heading').textContent = currentBld.label;
+    renderFsStats(currentBld.data, 'fsb', 'fsb-times-list');
+}
+
+// ============================================================
+//  TABS
+// ============================================================
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabViews = document.querySelectorAll('.tab-view');
+
+function switchTab(tab) {
+    if (timerState === 'RUNNING') stopTimer();
+    activeTab = tab;
+
+    tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    tabViews.forEach(v => v.classList.toggle('view-hidden', v.id !== 'view-' + tab));
+
+    if (tab === 'full-edges'   && !edgeScramble.length   && scramblerReady) newEdgeScramble();
+    if (tab === 'full-corners' && !cornerScramble.length && scramblerReady) newCornerScramble();
+    if (tab === 'full-bld'     && !bldScramble.length)   newBldScramble();
+}
+
+tabBtns.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+// ============================================================
+//  MANAGE TIMES MODAL
+// ============================================================
+const modal = document.getElementById('times-modal');
+const modalTypeSelect = document.getElementById('modal-type-select');
+const modalLetterSelect = document.getElementById('modal-letter-select');
+const modalTimesList = document.getElementById('times-list');
+
+function populateModalLetters() {
+    modalLetterSelect.innerHTML = '';
+    const type = modalTypeSelect.value;
+    const letters = type === 'edge' ? EDGE_LETTERS : CORNER_LETTERS;
+
+    const lastOpt = document.createElement('option');
+    lastOpt.value = '__last__'; lastOpt.textContent = 'Last (All Recent)';
+    modalLetterSelect.appendChild(lastOpt);
+
+    letters.forEach(l => {
+        const opt = document.createElement('option');
+        opt.value = l; opt.textContent = l;
+        modalLetterSelect.appendChild(opt);
+    });
+}
+
+function renderModalTimes() {
+    modalTimesList.innerHTML = '';
+    const type = modalTypeSelect.value;
+    const sel = modalLetterSelect.value;
+    const timesObj = type === 'edge' ? appData.edgeTimes : appData.cornerTimes;
+    const histArr = type === 'edge' ? appData.edgeHistory : appData.cornerHistory;
+
+    if (sel === '__last__') {
+        if (!histArr.length) {
+            const li = document.createElement('li');
+            li.textContent = 'No solves yet.'; li.style.color = 'var(--text-secondary)'; li.style.justifyContent = 'center';
+            modalTimesList.appendChild(li);
+            return;
+        }
+        [...histArr].reverse().forEach((entry, revIdx) => {
+            const realIdx = histArr.length - 1 - revIdx;
+            const li = document.createElement('li');
+            const info = document.createElement('span');
+            const badge = document.createElement('span');
+            badge.textContent = entry.letter;
+            badge.style.cssText = 'display:inline-block;background:rgba(59,130,246,0.2);color:var(--accent);border:1px solid rgba(59,130,246,0.4);border-radius:0.25rem;padding:0.1rem 0.45rem;margin-right:0.75rem;font-weight:700;font-size:1rem;';
+            info.appendChild(badge);
+            info.appendChild(document.createTextNode(fmt(entry.time)));
+            li.appendChild(info);
+            li.appendChild(makeDelBtn(() => {
+                histArr.splice(realIdx, 1);
+                const letterIdx = histArr.slice(0, realIdx).filter(e => e.letter === entry.letter).length;
+                if (timesObj[entry.letter]?.[letterIdx] !== undefined) timesObj[entry.letter].splice(letterIdx, 1);
+                saveData(); renderModalTimes();
+            }));
+            modalTimesList.appendChild(li);
+        });
+        return;
+    }
+
+    const times = timesObj[sel] || [];
+    if (!times.length) {
+        const li = document.createElement('li');
+        li.textContent = 'No times yet.'; li.style.color = 'var(--text-secondary)'; li.style.justifyContent = 'center';
+        modalTimesList.appendChild(li);
+        return;
+    }
+    [...times].reverse().forEach((t, revIdx) => {
+        const realIdx = times.length - 1 - revIdx;
+        const li = document.createElement('li');
+        li.textContent = fmt(t);
+        li.appendChild(makeDelBtn(() => {
+            timesObj[sel].splice(realIdx, 1);
+            let seen = 0;
+            for (let i = 0; i < histArr.length; i++) {
+                if (histArr[i].letter === sel) {
+                    if (seen === realIdx) { histArr.splice(i, 1); break; }
+                    seen++;
+                }
+            }
+            saveData(); renderModalTimes();
+        }));
+        modalTimesList.appendChild(li);
+    });
+}
+
+document.getElementById('btn-manage-times').addEventListener('click', () => {
+    populateModalLetters();
+    modalLetterSelect.value = '__last__';
+    renderModalTimes();
+    modal.classList.remove('hidden');
+});
+document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.add('hidden'));
+modalTypeSelect.addEventListener('change', () => { populateModalLetters(); renderModalTimes(); });
+modalLetterSelect.addEventListener('change', renderModalTimes);
+
+// ============================================================
+//  INIT
+// ============================================================
+loadData();
+renderAll();
+nextEdgeTarget();
+nextCornerTarget();
+
+// Init scrambler
+if (window.initScrambler) {
+    window.initScrambler().then(() => {
+        scramblerReady = true;
+        document.getElementById('fs-loading-edge').style.display = 'none';
+        document.getElementById('fs-loading-corner').style.display = 'none';
+        if (activeTab === 'full-edges') newEdgeScramble();
+        if (activeTab === 'full-corners') newCornerScramble();
+    });
+}
+
+// ============================================================
+//  TOUCH EVENTS (mobile timer)
+// ============================================================
+function getActiveTrainerArea() {
+    const viewId = 'view-' + activeTab;
+    const view = document.getElementById(viewId);
+    if (!view) return null;
+    return view.querySelector('.trainer-area');
+}
+
+// We attach touchstart/touchend to all trainer areas
+document.querySelectorAll('.trainer-area').forEach(area => {
+    area.addEventListener('touchstart', e => {
+        // Don't interfere with buttons/selects/inputs inside the area
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' ||
+            e.target.tagName === 'SELECT' || e.target.tagName === 'A') return;
+
+        if (timerState === 'RUNNING') {
+            e.preventDefault();
+            stopTimer();
+            area.classList.remove('touch-primed');
+            return;
+        }
+
+        if (timerState === 'IDLE' && !timerCooldown) {
+            e.preventDefault();
+            timerState = 'PRIMED';
+            setTimerColor('primed');
+            currentTime = 0;
+            updateTimerDisplay();
+            area.classList.add('touch-primed');
+
+            // Hide scramble if applicable
+            if (activeTab === 'full-edges' && document.getElementById('hide-on-start-edge').checked)
+                hideFsSequence('edge');
+            if (activeTab === 'full-corners' && document.getElementById('hide-on-start-corner').checked)
+                hideFsSequence('corner');
+            if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld').checked)
+                hideFsSequence('bld');
+        }
+    }, { passive: false });
+
+    area.addEventListener('touchend', e => {
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' ||
+            e.target.tagName === 'SELECT' || e.target.tagName === 'A') return;
+
+        if (timerState === 'PRIMED') {
+            e.preventDefault();
+            timerState = 'RUNNING';
+            setTimerColor('running');
+            area.classList.remove('touch-primed');
+            startTime = performance.now();
+            timerInterval = setInterval(() => {
+                currentTime = performance.now() - startTime;
+                updateTimerDisplay();
+            }, 10);
+        }
+    }, { passive: false });
+
+    // Prevent context menu on long-press
+    area.addEventListener('contextmenu', e => e.preventDefault());
+});
+
+// ============================================================
+//  MOBILE HINT BUTTONS
+// ============================================================
+document.getElementById('btn-hint-edge')?.addEventListener('click', () => {
+    if (activeTab === 'edge-alg' && edgeLetter !== '?') {
+        const h = document.getElementById('hint-text-edge');
+        h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
+        h.classList.remove('hidden');
+    }
+});
+document.getElementById('btn-hint-corner')?.addEventListener('click', () => {
+    if (activeTab === 'corner-alg' && cornerLetter !== '?') {
+        const h = document.getElementById('hint-text-corner');
+        h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
+        h.classList.remove('hidden');
+    }
+});
