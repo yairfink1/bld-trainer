@@ -209,6 +209,15 @@ window.applyRemoteData  = (remote) => { mergeRemoteData(remote); saveDataLocal()
 window.replaceRemoteData = (remote) => { 
     if (!remote) return;
     appData = remote; 
+    appData.edgeAlgorithms    = appData.edgeAlgorithms || {};
+    appData.edgeTimes         = appData.edgeTimes || {};
+    appData.edgeActive        = appData.edgeActive || {};
+    appData.cornerAlgorithms  = appData.cornerAlgorithms || {};
+    appData.cornerTimes       = appData.cornerTimes || {};
+    appData.cornerActive      = appData.cornerActive || {};
+    appData.deletedIds        = appData.deletedIds || [];
+    initDefaults(EDGE_LETTERS, appData.edgeTimes, appData.edgeActive);
+    initDefaults(CORNER_LETTERS, appData.cornerTimes, appData.cornerActive);
     migrateIds(); // ensure any raw data is formatted
     saveDataLocal(); 
 };
@@ -932,6 +941,18 @@ document.getElementById('btn-disconnect-sync').addEventListener('click', () => {
     disconnectSync();
     refreshSyncModal();
 });
+
+// Hard reload (PWA cache clearer)
+const btnHardReload = document.getElementById('btn-hard-reload');
+if (btnHardReload) {
+    btnHardReload.addEventListener('click', async () => {
+        if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (let r of regs) await r.unregister();
+        }
+        window.location.href = window.location.href.split('?')[0] + '?update=' + Date.now();
+    });
+}
 
 // ============================================================
 //  INIT
