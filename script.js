@@ -410,18 +410,27 @@ window.addEventListener('keyup', e => {
 // ============================================================
 //  SINGLE ALG: EDGES
 // ============================================================
+function getRawMean(times) {
+    if (!times || !times.length) return 9e9; // Empty = infinitely slow
+    const sum = times.reduce((acc, val) => acc + tv(val), 0);
+    return sum / times.length;
+}
+
+// ============================================================
+//  SINGLE ALG: EDGES
+// ============================================================
 function nextEdgeTarget() {
     const active = EDGE_LETTERS.filter(l => appData.edgeActive[l]);
     if (!active.length) { edgeLetter = '?'; document.getElementById('target-letter-edge').textContent = '?'; return; }
+    
     const mode = document.getElementById('practice-mode-edge').value;
-    if (mode === 'slowest') {
-        const sorted = [...active].sort((a,b) => {
-            const sumA = appData.edgeTimes[a].reduce((acc, val) => acc + tv(val), 0);
-            const mA = appData.edgeTimes[a].length ? sumA / appData.edgeTimes[a].length : 9e9;
-            const sumB = appData.edgeTimes[b].reduce((acc, val) => acc + tv(val), 0);
-            const mB = appData.edgeTimes[b].length ? sumB / appData.edgeTimes[b].length : 9e9;
-            return mB - mA; // Slower (larger mA) comes first
+    if (mode === 'slowest' || mode === 'fastest') {
+        const sorted = [...active].sort((a, b) => {
+            const mA = getRawMean(appData.edgeTimes[a]);
+            const mB = getRawMean(appData.edgeTimes[b]);
+            return mode === 'slowest' ? mB - mA : mA - mB;
         });
+        // Pick from top 3 candidates to add some variety
         const pool = sorted.slice(0, Math.min(3, sorted.length));
         edgeLetter = pool[Math.floor(Math.random() * pool.length)];
     } else {
@@ -437,14 +446,13 @@ function nextEdgeTarget() {
 function nextCornerTarget() {
     const active = CORNER_LETTERS.filter(l => appData.cornerActive[l]);
     if (!active.length) { cornerLetter = '?'; document.getElementById('target-letter-corner').textContent = '?'; return; }
+    
     const mode = document.getElementById('practice-mode-corner').value;
-    if (mode === 'slowest') {
-        const sorted = [...active].sort((a,b) => {
-            const sumA = appData.cornerTimes[a].reduce((acc, val) => acc + tv(val), 0);
-            const mA = appData.cornerTimes[a].length ? sumA / appData.cornerTimes[a].length : 9e9;
-            const sumB = appData.cornerTimes[b].reduce((acc, val) => acc + tv(val), 0);
-            const mB = appData.cornerTimes[b].length ? sumB / appData.cornerTimes[b].length : 9e9;
-            return mB - mA;
+    if (mode === 'slowest' || mode === 'fastest') {
+        const sorted = [...active].sort((a, b) => {
+            const mA = getRawMean(appData.cornerTimes[a]);
+            const mB = getRawMean(appData.cornerTimes[b]);
+            return mode === 'slowest' ? mB - mA : mA - mB;
         });
         const pool = sorted.slice(0, Math.min(3, sorted.length));
         cornerLetter = pool[Math.floor(Math.random() * pool.length)];
