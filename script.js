@@ -580,6 +580,54 @@ document.querySelectorAll('[data-reset]').forEach(btn => {
 function renderAlgTable(letters, timesObj, activeObj, algObj, tbodyId) {
     const tbody = document.getElementById(tbodyId);
     tbody.innerHTML = '';
+
+    // Calculate GLOBAL stats
+    let allSolves = [];
+    let allChecked = true;
+    let anyChecked = false;
+    letters.forEach(l => {
+        if (activeObj[l]) anyChecked = true;
+        else allChecked = false;
+        
+        const t = timesObj[l] || [];
+        t.forEach(solve => {
+            allSolves.push({ val: tv(solve), id: solve.id || "0" });
+        });
+    });
+    
+    allSolves.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    const flatTimes = allSolves.map(o => o.val);
+    
+    // Create ALL row
+    const trAll = document.createElement('tr');
+    trAll.style.backgroundColor = 'var(--panel-border)';
+    trAll.style.fontWeight = 'bold';
+    
+    const tdAllCb = document.createElement('td');
+    const cbAll = document.createElement('input');
+    cbAll.type = 'checkbox'; 
+    cbAll.checked = allChecked;
+    cbAll.indeterminate = anyChecked && !allChecked;
+    cbAll.addEventListener('change', () => {
+        const state = cbAll.checked;
+        letters.forEach(l => activeObj[l] = state);
+        saveData();
+    });
+    tdAllCb.appendChild(cbAll);
+    
+    const tdAllL = document.createElement('td');
+    tdAllL.className = 'letter-cell'; tdAllL.textContent = 'ALL';
+    
+    const tdAllA = document.createElement('td'); // empty alg cell
+    
+    const tdAllB = document.createElement('td'); tdAllB.className='stat-val'; tdAllB.textContent=calcBest(flatTimes);
+    const tdAll5 = document.createElement('td'); tdAll5.className='stat-val'; tdAll5.textContent=calcAoN(flatTimes, 5);
+    const tdAllM = document.createElement('td'); tdAllM.className='stat-val'; tdAllM.textContent=calcMean(flatTimes);
+    const tdAllC = document.createElement('td'); tdAllC.className='stat-val'; tdAllC.textContent=flatTimes.length;
+    
+    [tdAllCb, tdAllL, tdAllA, tdAllB, tdAll5, tdAllM, tdAllC].forEach(td => trAll.appendChild(td));
+    tbody.appendChild(trAll);
+
     letters.forEach(l => {
         const tr = document.createElement('tr');
 
