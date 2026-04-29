@@ -426,7 +426,8 @@ input[type="checkbox"] {
     cursor: default;
 }
 .sync-dot.synced  { background: var(--success); }
-.sync-dot.syncing { background: #f59e0b; animation: pulse-sync 1s ease infinite; }
+.sync-dot.syncing { background: #3b82f6; animation: pulse-sync 1s ease infinite; } /* blue */
+.sync-dot.pending { background: #f59e0b; } /* yellow, solid */
 .sync-dot.error   { background: var(--danger); }
 
 @keyframes pulse-sync {

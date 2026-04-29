@@ -11,7 +11,9 @@ const API_BASE  = 'https://api.github.com';
 
 // ---- Debounce state ----
 let _pushTimer = null;
-const PUSH_DEBOUNCE_MS = 2000;
+const PUSH_DEBOUNCE_MS = 15000; // 15 seconds (to avoid GitHub 300/hr limit)
+let _isDirty = false;
+let _lastAppData = null;
 
 // ---- Indicator state ----
 function updateSyncIndicator(state) {
@@ -22,7 +24,8 @@ function updateSyncIndicator(state) {
         '':        'Sync disabled',
         synced:    'Synced ✓',
         syncing:   'Syncing…',
-        error:     'Sync error — check connection',
+        pending:   'Changes pending sync...',
+        error:     'Sync error — check connection or rate limits',
         conflict:  'Merge conflict resolved',
     };
     dot.title = labels[state] || state;
@@ -115,16 +118,27 @@ async function setupSync(token) {
 // ---- Push ----
 function pushToGist(appData) {
     if (!isSyncEnabled()) return;
+    _isDirty = true;
+    _lastAppData = appData;
     clearTimeout(_pushTimer);
+    updateSyncIndicator('pending'); // yellow dot showing a save is queued
     _pushTimer = setTimeout(() => _doPush(appData), PUSH_DEBOUNCE_MS);
 }
 
-async function _doPush(appData) {
+// Push immediately if they switch tabs, minimize, or close the app
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && _isDirty && _lastAppData) {
+        clearTimeout(_pushTimer);
+        _doPush(_lastAppData, true); // true = use keepalive
+    }
+});
+
+async function _doPush(appData, isUnloading = false) {
     const token  = localStorage.getItem(LS_TOKEN);
     const gistId = localStorage.getItem(LS_GISTID);
     if (!token || !gistId) return;
 
-    updateSyncIndicator('syncing');
+    if (!isUnloading) updateSyncIndicator('syncing');
     try {
         const r = await fetch(`${API_BASE}/gists/${gistId}`, {
             method: 'PATCH',
@@ -132,6 +146,7 @@ async function _doPush(appData) {
                 Authorization: `token ${token}`,
                 'Content-Type': 'application/json'
             },
+            keepalive: isUnloading, // Allows request to outlive the page closing
             body: JSON.stringify({
                 files: {
                     [GIST_FILENAME]: { content: JSON.stringify(appData, null, 2) }
@@ -139,12 +154,13 @@ async function _doPush(appData) {
             })
         });
         if (r.ok) {
-            updateSyncIndicator('synced');
+            _isDirty = false;
+            if (!isUnloading) updateSyncIndicator('synced');
         } else {
-            updateSyncIndicator('error');
+            if (!isUnloading) updateSyncIndicator('error');
         }
     } catch (e) {
-        updateSyncIndicator('error');
+        if (!isUnloading) updateSyncIndicator('error');
     }
 }
 
