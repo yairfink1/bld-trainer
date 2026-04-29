@@ -443,16 +443,24 @@ function deleteLast() {
     switch (activeTab) {
         case 'edge-alg':
             if (lastEdgeAdded && appData.edgeTimes[lastEdgeAdded]?.length) {
-                appData.edgeTimes[lastEdgeAdded].pop();
-                if (appData.edgeHistory.length) appData.edgeHistory.pop();
+                const removed = appData.edgeTimes[lastEdgeAdded].pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                if (appData.edgeHistory.length) {
+                    const histRem = appData.edgeHistory.pop();
+                    if (histRem?.id) appData.deletedIds.push(histRem.id);
+                }
                 lastEdgeAdded = null;
                 saveData(); currentTime = 0; updateTimerDisplay();
             }
             break;
         case 'corner-alg':
             if (lastCornerAdded && appData.cornerTimes[lastCornerAdded]?.length) {
-                appData.cornerTimes[lastCornerAdded].pop();
-                if (appData.cornerHistory.length) appData.cornerHistory.pop();
+                const removed = appData.cornerTimes[lastCornerAdded].pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                if (appData.cornerHistory.length) {
+                    const histRem = appData.cornerHistory.pop();
+                    if (histRem?.id) appData.deletedIds.push(histRem.id);
+                }
                 lastCornerAdded = null;
                 saveData(); currentTime = 0; updateTimerDisplay();
             }
@@ -460,31 +468,47 @@ function deleteLast() {
         case 'full-edges':
             const modeE = document.getElementById('mode-toggle-edge').value;
             if (modeE === 'full' && lastFsEdgeAdded && appData.fullEdgeTimes.length) {
-                appData.fullEdgeTimes.pop(); lastFsEdgeAdded = false;
+                const removed = appData.fullEdgeTimes.pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                lastFsEdgeAdded = false;
             } else if (modeE === 'exec' && lastFsEdgeExecAdded && appData.fullEdgeExecTimes.length) {
-                appData.fullEdgeExecTimes.pop(); lastFsEdgeExecAdded = false;
+                const removed = appData.fullEdgeExecTimes.pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                lastFsEdgeExecAdded = false;
             }
             saveData(); currentTime = 0; updateTimerDisplay();
             break;
         case 'full-corners':
             const modeC = document.getElementById('mode-toggle-corner').value;
             if (modeC === 'full' && lastFsCornerAdded && appData.fullCornerTimes.length) {
-                appData.fullCornerTimes.pop(); lastFsCornerAdded = false;
+                const removed = appData.fullCornerTimes.pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                lastFsCornerAdded = false;
             } else if (modeC === 'exec' && lastFsCornerExecAdded && appData.fullCornerExecTimes.length) {
-                appData.fullCornerExecTimes.pop(); lastFsCornerExecAdded = false;
+                const removed = appData.fullCornerExecTimes.pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                lastFsCornerExecAdded = false;
             }
             saveData(); currentTime = 0; updateTimerDisplay();
             break;
         case 'full-bld':
             const modeB = document.getElementById('mode-toggle-bld').value;
             if (modeB === 'bld-full' && lastFsBldFullAdded && appData.fullBldTimes.length) {
-                appData.fullBldTimes.pop(); lastFsBldFullAdded = false;
+                const removed = appData.fullBldTimes.pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                lastFsBldFullAdded = false;
             } else if (modeB === 'bld-exec' && lastFsBldExecAdded && appData.fullBldExecTimes.length) {
-                appData.fullBldExecTimes.pop(); lastFsBldExecAdded = false;
+                const removed = appData.fullBldExecTimes.pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                lastFsBldExecAdded = false;
             } else if (modeB === 'regular' && lastFsRegularAdded && appData.fullRegularTimes.length) {
-                appData.fullRegularTimes.pop(); lastFsRegularAdded = false;
+                const removed = appData.fullRegularTimes.pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                lastFsRegularAdded = false;
             } else if (modeB === 'oh' && lastFsOhAdded && appData.fullOhTimes.length) {
-                appData.fullOhTimes.pop(); lastFsOhAdded = false;
+                const removed = appData.fullOhTimes.pop();
+                if (removed?.id) appData.deletedIds.push(removed.id);
+                lastFsOhAdded = false;
             }
             saveData(); currentTime = 0; updateTimerDisplay();
             break;
