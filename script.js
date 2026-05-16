@@ -259,6 +259,9 @@ let lastFsEdgeAdded = false, lastFsCornerAdded = false, lastFsBldAdded = false;
 let lastFsEdgeExecAdded = false, lastFsCornerExecAdded = false; 
 let lastFsBldFullAdded = false, lastFsBldExecAdded = false, lastFsRegularAdded = false, lastFsOhAdded = false;
 let edgeScramble = [], cornerScramble = [], bldScramble = [];
+let prevEdgeLetter = '', prevCornerLetter = '';
+let prevEdgeScramble = [], prevCornerScramble = [], prevBldScramble = [];
+let showingPrevious = false;
 let scramblerReady = false;
 
 function getTimerEl() {
@@ -316,6 +319,7 @@ function stopTimer() {
                 lastFsEdgeExecAdded = true;
             }
             showFsSequence('edge');
+            newEdgeScramble();
             saveData();
             break;
         case 'full-corners':
@@ -328,6 +332,7 @@ function stopTimer() {
                 lastFsCornerExecAdded = true;
             }
             showFsSequence('corner');
+            newCornerScramble();
             saveData();
             break;
         case 'full-bld':
@@ -346,6 +351,7 @@ function stopTimer() {
                 lastFsOhAdded = true;
             }
             showFsSequence('bld');
+            newBldScramble();
             saveData();
             break;
     }
@@ -366,6 +372,7 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Space') {
         e.preventDefault();
         if (timerState === 'IDLE' && !timerCooldown) {
+            if (showingPrevious) togglePreviousScramble(); // revert to current before starting
             timerState = 'PRIMED';
             setTimerColor('primed');
             currentTime = 0;
@@ -378,6 +385,9 @@ window.addEventListener('keydown', e => {
             if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld').checked)
                 hideFsSequence('bld');
         }
+    } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        togglePreviousScramble();
     } else if (e.code === 'ArrowRight') {
         if (activeTab === 'edge-alg' && edgeLetter !== '?') {
             const h = document.getElementById('hint-text-edge');
@@ -423,6 +433,8 @@ function nextEdgeTarget() {
     const active = EDGE_LETTERS.filter(l => appData.edgeActive[l]);
     if (!active.length) { edgeLetter = '?'; document.getElementById('target-letter-edge').textContent = '?'; return; }
     
+    prevEdgeLetter = edgeLetter; // save previous
+
     const mode = document.getElementById('practice-mode-edge').value;
     if (mode === 'slowest' || mode === 'fastest') {
         const sorted = [...active].sort((a, b) => {
@@ -436,6 +448,8 @@ function nextEdgeTarget() {
     } else {
         edgeLetter = active[Math.floor(Math.random() * active.length)];
     }
+    
+    if (showingPrevious) togglePreviousScramble();
     document.getElementById('target-letter-edge').textContent = edgeLetter;
     document.getElementById('hint-text-edge').classList.add('hidden');
 }
@@ -447,6 +461,8 @@ function nextCornerTarget() {
     const active = CORNER_LETTERS.filter(l => appData.cornerActive[l]);
     if (!active.length) { cornerLetter = '?'; document.getElementById('target-letter-corner').textContent = '?'; return; }
     
+    prevCornerLetter = cornerLetter; // save previous
+
     const mode = document.getElementById('practice-mode-corner').value;
     if (mode === 'slowest' || mode === 'fastest') {
         const sorted = [...active].sort((a, b) => {
@@ -459,6 +475,8 @@ function nextCornerTarget() {
     } else {
         cornerLetter = active[Math.floor(Math.random() * active.length)];
     }
+    
+    if (showingPrevious) togglePreviousScramble();
     document.getElementById('target-letter-corner').textContent = cornerLetter;
     document.getElementById('hint-text-corner').classList.add('hidden');
 }
@@ -683,7 +701,7 @@ function hideFsSequence(type) {
     document.getElementById('fs-hidden-' + type).classList.remove('hidden');
 }
 
-function renderScramble(moves, type) {
+function renderScramble(moves, type, dontResetTimer = false) {
     const el = document.getElementById('fs-sequence-' + type);
     el.innerHTML = '';
     moves.forEach(m => {
@@ -692,13 +710,17 @@ function renderScramble(moves, type) {
         el.appendChild(span);
     });
     showFsSequence(type);
-    document.getElementById('fs-timer-' + type).textContent = '0.00';
-    currentTime = 0;
+    if (!dontResetTimer) {
+        document.getElementById('fs-timer-' + type).textContent = '0.00';
+        currentTime = 0;
+    }
 }
 
 function newEdgeScramble() {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
+    if (showingPrevious) togglePreviousScramble();
+    prevEdgeScramble = edgeScramble;
     const s = window.generateEdgesOnlyScramble();
     edgeScramble = s.split(' ').filter(m => m.length);
     renderScramble(edgeScramble, 'edge');
@@ -708,6 +730,8 @@ function newEdgeScramble() {
 function newCornerScramble() {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
+    if (showingPrevious) togglePreviousScramble();
+    prevCornerScramble = cornerScramble;
     const s = window.generateCornersOnlyScramble();
     cornerScramble = s.split(' ').filter(m => m.length);
     renderScramble(cornerScramble, 'corner');
@@ -720,6 +744,8 @@ document.getElementById('btn-new-scramble-corner').addEventListener('click', new
 // ---- Full BLD scramble ----
 function newBldScramble() {
     if (timerState === 'RUNNING') return;
+    if (showingPrevious) togglePreviousScramble();
+    prevBldScramble = bldScramble;
     const len = parseInt(document.getElementById('scramble-length-bld').value) || 25;
     const s = window.generateFullScramble(len);
     bldScramble = s.split(' ').filter(m => m.length);
@@ -1091,6 +1117,50 @@ document.querySelectorAll('.trainer-area').forEach(area => {
         }
     }, { passive: false });
 
+    document.getElementById('main-nav').addEventListener('click', e => {
+        if (e.target.tagName === 'BUTTON') switchTab(e.target.dataset.tab);
+    });
+});
+
+// ============================================================
+//  PREVIOUS SCRAMBLE TOGGLE
+// ============================================================
+function togglePreviousScramble() {
+    if (timerState === 'RUNNING') return;
+    showingPrevious = !showingPrevious;
+    
+    const applyBorder = (id, show) => document.getElementById(id).style.border = show ? '2px solid var(--warning)' : '';
+    const applyColor = (id, show) => document.getElementById(id).style.color = show ? 'var(--warning)' : '';
+    
+    switch (activeTab) {
+        case 'edge-alg':
+            document.getElementById('target-letter-edge').textContent = showingPrevious ? prevEdgeLetter || '?' : edgeLetter;
+            applyColor('target-letter-edge', showingPrevious && prevEdgeLetter);
+            break;
+        case 'corner-alg':
+            document.getElementById('target-letter-corner').textContent = showingPrevious ? prevCornerLetter || '?' : cornerLetter;
+            applyColor('target-letter-corner', showingPrevious && prevCornerLetter);
+            break;
+        case 'full-edges':
+            renderScramble(showingPrevious ? (prevEdgeScramble.length ? prevEdgeScramble : edgeScramble) : edgeScramble, 'edge', true);
+            applyBorder('fs-sequence-edge', showingPrevious && prevEdgeScramble.length);
+            break;
+        case 'full-corners':
+            renderScramble(showingPrevious ? (prevCornerScramble.length ? prevCornerScramble : cornerScramble) : cornerScramble, 'corner', true);
+            applyBorder('fs-sequence-corner', showingPrevious && prevCornerScramble.length);
+            break;
+        case 'full-bld':
+            renderScramble(showingPrevious ? (prevBldScramble.length ? prevBldScramble : bldScramble) : bldScramble, 'bld', true);
+            applyBorder('fs-sequence-bld', showingPrevious && prevBldScramble.length);
+            break;
+    }
+}
+
+    document.querySelectorAll('.btn-prev-scramble').forEach(btn => {
+        btn.addEventListener('click', togglePreviousScramble);
+    });
+
+    document.querySelectorAll('.trainer-area').forEach(area => {
     area.addEventListener('touchend', e => {
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' ||
             e.target.tagName === 'SELECT' || e.target.tagName === 'A') return;

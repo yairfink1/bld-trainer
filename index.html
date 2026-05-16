@@ -40,12 +40,15 @@
         <div id="view-edge-alg" class="tab-view">
             <div class="sub-controls">
                 <label for="practice-mode-edge">Mode:</label>
+                <div style="display:flex; gap:0.5rem">
+                    <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
                     <select id="practice-mode-edge">
                         <option value="random">Random</option>
                         <option value="slowest">Slowest First</option>
                         <option value="fastest">Fastest First</option>
                     </select>
                 </div>
+            </div>
             <main class="trainer-area">
                 <div class="target-display">
                     <span id="target-letter-edge">?</span>
@@ -80,12 +83,15 @@
         <div id="view-corner-alg" class="tab-view view-hidden">
             <div class="sub-controls">
                 <label for="practice-mode-corner">Mode:</label>
+                <div style="display:flex; gap:0.5rem">
+                    <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
                     <select id="practice-mode-corner">
                         <option value="random">Random</option>
                         <option value="slowest">Slowest First</option>
                         <option value="fastest">Fastest First</option>
                     </select>
                 </div>
+            </div>
             <main class="trainer-area">
                 <div class="target-display">
                     <span id="target-letter-corner">?</span>
@@ -127,7 +133,10 @@
                     <input type="checkbox" id="hide-on-start-edge" checked>
                     Hide scramble on start
                 </label>
-                <button id="btn-new-scramble-edge" class="btn secondary">New Scramble ⟳</button>
+                <div style="display:flex; gap:0.5rem">
+                    <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
+                    <button id="btn-new-scramble-edge" class="btn secondary">New Scramble ⟳</button>
+                </div>
             </div>
             <main class="trainer-area fs-trainer-area">
                 <div class="fs-sequence-wrap">
@@ -170,7 +179,10 @@
                     <input type="checkbox" id="hide-on-start-corner" checked>
                     Hide scramble on start
                 </label>
-                <button id="btn-new-scramble-corner" class="btn secondary">New Scramble ⟳</button>
+                <div style="display:flex; gap:0.5rem">
+                    <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
+                    <button id="btn-new-scramble-corner" class="btn secondary">New Scramble ⟳</button>
+                </div>
             </div>
             <main class="trainer-area fs-trainer-area">
                 <div class="fs-sequence-wrap">
@@ -220,7 +232,10 @@
                     <input type="checkbox" id="hide-on-start-bld" checked>
                     Hide scramble on start
                 </label>
-                <button id="btn-new-scramble-bld" class="btn secondary">New Scramble ⟳</button>
+                <div style="display:flex; gap:0.5rem">
+                    <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
+                    <button id="btn-new-scramble-bld" class="btn secondary">New Scramble ⟳</button>
+                </div>
             </div>
             <main class="trainer-area fs-trainer-area">
                 <div class="fs-sequence-wrap">
