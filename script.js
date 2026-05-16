@@ -319,7 +319,7 @@ function stopTimer() {
                 lastFsEdgeExecAdded = true;
             }
             showFsSequence('edge');
-            newEdgeScramble();
+            newEdgeScramble(true);
             saveData();
             break;
         case 'full-corners':
@@ -332,7 +332,7 @@ function stopTimer() {
                 lastFsCornerExecAdded = true;
             }
             showFsSequence('corner');
-            newCornerScramble();
+            newCornerScramble(true);
             saveData();
             break;
         case 'full-bld':
@@ -351,7 +351,7 @@ function stopTimer() {
                 lastFsOhAdded = true;
             }
             showFsSequence('bld');
-            newBldScramble();
+            newBldScramble(true);
             saveData();
             break;
     }
@@ -389,15 +389,27 @@ window.addEventListener('keydown', e => {
         e.preventDefault();
         togglePreviousScramble();
     } else if (e.code === 'ArrowRight') {
-        if (activeTab === 'edge-alg' && edgeLetter !== '?') {
-            const h = document.getElementById('hint-text-edge');
-            h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
-            h.classList.remove('hidden');
-        }
-        if (activeTab === 'corner-alg' && cornerLetter !== '?') {
-            const h = document.getElementById('hint-text-corner');
-            h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
-            h.classList.remove('hidden');
+        if (showingPrevious) {
+            togglePreviousScramble();
+        } else {
+            if (activeTab === 'edge-alg') {
+                if (edgeLetter !== '?') {
+                    const h = document.getElementById('hint-text-edge');
+                    h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
+                    h.classList.remove('hidden');
+                }
+            } else if (activeTab === 'corner-alg') {
+                if (cornerLetter !== '?') {
+                    const h = document.getElementById('hint-text-corner');
+                    h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
+                    h.classList.remove('hidden');
+                }
+            } else {
+                // "Next" logic for full solves
+                if (activeTab === 'full-edges') newEdgeScramble(false);
+                else if (activeTab === 'full-corners') newCornerScramble(false);
+                else if (activeTab === 'full-bld') newBldScramble(false);
+            }
         }
     } else if (e.code === 'KeyZ' && e.altKey) {
         deleteLast();
@@ -716,43 +728,59 @@ function renderScramble(moves, type, dontResetTimer = false) {
     }
 }
 
-function newEdgeScramble() {
+function newEdgeScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
     if (showingPrevious) togglePreviousScramble();
     prevEdgeScramble = edgeScramble;
     const s = window.generateEdgesOnlyScramble();
     edgeScramble = s.split(' ').filter(m => m.length);
-    renderScramble(edgeScramble, 'edge');
+    renderScramble(edgeScramble, 'edge', dontResetTimer);
     lastFsEdgeAdded = false;
 }
 
-function newCornerScramble() {
+function newCornerScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
     if (showingPrevious) togglePreviousScramble();
     prevCornerScramble = cornerScramble;
     const s = window.generateCornersOnlyScramble();
     cornerScramble = s.split(' ').filter(m => m.length);
-    renderScramble(cornerScramble, 'corner');
+    renderScramble(cornerScramble, 'corner', dontResetTimer);
     lastFsCornerAdded = false;
 }
 
-document.getElementById('btn-new-scramble-edge').addEventListener('click', newEdgeScramble);
-document.getElementById('btn-new-scramble-corner').addEventListener('click', newCornerScramble);
+function handleNextScrambleEdge() {
+    if (showingPrevious) togglePreviousScramble();
+    else newEdgeScramble(false);
+}
+
+function handleNextScrambleCorner() {
+    if (showingPrevious) togglePreviousScramble();
+    else newCornerScramble(false);
+}
+
+document.getElementById('btn-new-scramble-edge').addEventListener('click', handleNextScrambleEdge);
+document.getElementById('btn-new-scramble-corner').addEventListener('click', handleNextScrambleCorner);
 
 // ---- Full BLD scramble ----
-function newBldScramble() {
+function newBldScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     if (showingPrevious) togglePreviousScramble();
     prevBldScramble = bldScramble;
     const len = parseInt(document.getElementById('scramble-length-bld').value) || 25;
     const s = window.generateFullScramble(len);
     bldScramble = s.split(' ').filter(m => m.length);
-    renderScramble(bldScramble, 'bld');
+    renderScramble(bldScramble, 'bld', dontResetTimer);
     lastFsBldAdded = false;
 }
-document.getElementById('btn-new-scramble-bld').addEventListener('click', newBldScramble);
+
+function handleNextScrambleBld() {
+    if (showingPrevious) togglePreviousScramble();
+    else newBldScramble(false);
+}
+
+document.getElementById('btn-new-scramble-bld').addEventListener('click', handleNextScrambleBld);
 // Generate immediately (no solver needed)
 newBldScramble();
 
@@ -1156,11 +1184,13 @@ function togglePreviousScramble() {
     }
 }
 
-    document.querySelectorAll('.btn-prev-scramble').forEach(btn => {
-        btn.addEventListener('click', togglePreviousScramble);
-    });
+// Setup prev buttons
+document.querySelectorAll('.btn-prev-scramble').forEach(btn => {
+    btn.addEventListener('click', togglePreviousScramble);
+});
 
-    document.querySelectorAll('.trainer-area').forEach(area => {
+// Re-attach remaining part of original code
+document.querySelectorAll('.trainer-area').forEach(area => {
     area.addEventListener('touchend', e => {
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' ||
             e.target.tagName === 'SELECT' || e.target.tagName === 'A') return;
