@@ -355,6 +355,7 @@ function stopTimer() {
             saveData();
             break;
     }
+    updateScrambleVisualizerVisibility();
 }
 
 // ============================================================
@@ -384,6 +385,7 @@ window.addEventListener('keydown', e => {
                 hideFsSequence('corner');
             if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld').checked)
                 hideFsSequence('bld');
+            updateScrambleVisualizerVisibility();
         }
     } else if (e.code === 'ArrowLeft') {
         e.preventDefault();
@@ -421,6 +423,7 @@ window.addEventListener('keyup', e => {
     if (e.code === 'Space' && timerState === 'PRIMED') {
         timerState = 'RUNNING';
         setTimerColor('running');
+        updateScrambleVisualizerVisibility();
         startTime = performance.now();
         timerInterval = setInterval(() => {
             currentTime = performance.now() - startTime;
@@ -706,11 +709,13 @@ function renderAlgTable(letters, timesObj, activeObj, algObj, tbodyId) {
 function showFsSequence(type) {
     document.getElementById('fs-sequence-' + type).classList.remove('view-hidden');
     document.getElementById('fs-hidden-' + type).classList.add('hidden');
+    updateScrambleVisualizerVisibility();
 }
 
 function hideFsSequence(type) {
     document.getElementById('fs-sequence-' + type).classList.add('view-hidden');
     document.getElementById('fs-hidden-' + type).classList.remove('hidden');
+    updateScrambleVisualizerVisibility();
 }
 
 function renderScramble(moves, type, dontResetTimer = false) {
@@ -725,6 +730,147 @@ function renderScramble(moves, type, dontResetTimer = false) {
     if (!dontResetTimer) {
         document.getElementById('fs-timer-' + type).textContent = '0.00';
         currentTime = 0;
+    }
+    updateScrambleVisualizerVisibility();
+}
+
+// ============================================================
+//  3x3 SCRAMBLE VISUALIZER SIMULATOR
+// ============================================================
+function rotateFaceClockwise(state, faceIndex) {
+    var offset = faceIndex * 9;
+    var temp = [state[offset + 0], state[offset + 1]];
+    state[offset + 0] = state[offset + 6];
+    state[offset + 1] = state[offset + 3];
+    state[offset + 6] = state[offset + 8];
+    state[offset + 3] = state[offset + 7];
+    state[offset + 8] = state[offset + 2];
+    state[offset + 7] = state[offset + 5];
+    state[offset + 2] = temp[0];
+    state[offset + 5] = temp[1];
+}
+
+function applyScrambleMove(state, move) {
+    var face = move[0];
+    var suffix = move.substring(1);
+    var count = 1;
+    if (suffix === "'") {
+        count = 3;
+    } else if (suffix === "2") {
+        count = 2;
+    }
+
+    for (var step = 0; step < count; step++) {
+        if (face === 'U') {
+            rotateFaceClockwise(state, 0);
+            var temp = [state[36], state[37], state[38]];
+            state[36] = state[18]; state[37] = state[19]; state[38] = state[20];
+            state[18] = state[9]; state[19] = state[10]; state[20] = state[11];
+            state[9] = state[45]; state[10] = state[46]; state[11] = state[47];
+            state[45] = temp[0]; state[46] = temp[1]; state[47] = temp[2];
+        } else if (face === 'D') {
+            rotateFaceClockwise(state, 3);
+            var temp = [state[24], state[25], state[26]];
+            state[24] = state[42]; state[25] = state[43]; state[26] = state[44];
+            state[42] = state[53]; state[43] = state[52]; state[44] = state[51];
+            state[53] = state[15]; state[52] = state[16]; state[51] = state[17];
+            state[15] = temp[0]; state[16] = temp[1]; state[17] = temp[2];
+        } else if (face === 'R') {
+            rotateFaceClockwise(state, 1);
+            var temp = [state[2], state[5], state[8]];
+            state[2] = state[20]; state[5] = state[23]; state[8] = state[26];
+            state[20] = state[29]; state[23] = state[32]; state[26] = state[35];
+            state[29] = state[51]; state[32] = state[48]; state[35] = state[45];
+            state[51] = temp[0]; state[48] = temp[1]; state[45] = temp[2];
+        } else if (face === 'L') {
+            rotateFaceClockwise(state, 4);
+            var temp = [state[0], state[3], state[6]];
+            state[0] = state[53]; state[3] = state[50]; state[6] = state[47];
+            state[53] = state[27]; state[50] = state[30]; state[47] = state[33];
+            state[27] = state[18]; state[30] = state[21]; state[33] = state[24];
+            state[18] = temp[0]; state[21] = temp[1]; state[24] = temp[2];
+        } else if (face === 'F') {
+            rotateFaceClockwise(state, 2);
+            var temp = [state[6], state[7], state[8]];
+            state[6] = state[44]; state[7] = state[41]; state[8] = state[38];
+            state[44] = state[29]; state[41] = state[28]; state[38] = state[27];
+            state[29] = state[9]; state[28] = state[12]; state[27] = state[15];
+            state[9] = temp[0]; state[12] = temp[1]; state[15] = temp[2];
+        } else if (face === 'B') {
+            rotateFaceClockwise(state, 5);
+            var temp = [state[0], state[1], state[2]];
+            state[0] = state[11]; state[1] = state[14]; state[2] = state[17];
+            state[11] = state[35]; state[14] = state[34]; state[17] = state[33];
+            state[35] = state[42]; state[34] = state[39]; state[33] = state[36];
+            state[42] = temp[0]; state[39] = temp[1]; state[36] = temp[2];
+        }
+    }
+}
+
+function drawScramble(moves) {
+    // Solve state: 6 faces x 9 stickers
+    // Faces: 0=U, 1=R, 2=F, 3=D, 4=L, 5=B
+    var state = [];
+    var faceLetters = ['U', 'R', 'F', 'D', 'L', 'B'];
+    for (var f = 0; f < 6; f++) {
+        for (var i = 0; i < 9; i++) {
+            state.push(faceLetters[f]);
+        }
+    }
+
+    if (moves && moves.length) {
+        moves.forEach(function(move) {
+            if (move && move.length) {
+                applyScrambleMove(state, move);
+            }
+        });
+    }
+
+    for (var i = 0; i < 9; i++) {
+        var el = document.getElementById('sticker-' + i);
+        if (el) {
+            el.className = 'sticker';
+            el.classList.add('color-' + state[i]);
+        }
+    }
+
+    var container = document.getElementById('scramble-draw-view');
+    if (container) {
+        container.classList.remove('animate-pop');
+        void container.offsetWidth;
+        container.classList.add('animate-pop');
+    }
+}
+
+function updateScrambleVisualizerVisibility() {
+    const box = document.getElementById('scramble-draw-view');
+    if (!box) return;
+
+    const isFullTab = (activeTab === 'full-edges' || activeTab === 'full-corners' || activeTab === 'full-bld');
+    let shouldHide = !isFullTab || (timerState === 'RUNNING' || timerState === 'PRIMED');
+
+    if (isFullTab) {
+        if (activeTab === 'full-edges' && document.getElementById('hide-on-start-edge')?.checked && document.getElementById('fs-sequence-edge')?.classList.contains('view-hidden')) {
+            shouldHide = true;
+        }
+        if (activeTab === 'full-corners' && document.getElementById('hide-on-start-corner')?.checked && document.getElementById('fs-sequence-corner')?.classList.contains('view-hidden')) {
+            shouldHide = true;
+        }
+        if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld')?.checked && document.getElementById('fs-sequence-bld')?.classList.contains('view-hidden')) {
+            shouldHide = true;
+        }
+    }
+
+    if (shouldHide) {
+        box.classList.add('hidden');
+    } else {
+        box.classList.remove('hidden');
+        let moves = [];
+        if (activeTab === 'full-edges') moves = showingPrevious ? (prevEdgeScramble.length ? prevEdgeScramble : edgeScramble) : edgeScramble;
+        else if (activeTab === 'full-corners') moves = showingPrevious ? (prevCornerScramble.length ? prevCornerScramble : cornerScramble) : cornerScramble;
+        else if (activeTab === 'full-bld') moves = showingPrevious ? (prevBldScramble.length ? prevBldScramble : bldScramble) : bldScramble;
+        
+        drawScramble(moves);
     }
 }
 
@@ -875,6 +1021,8 @@ function switchTab(tab) {
     if (tab === 'full-edges'   && !edgeScramble.length   && scramblerReady) newEdgeScramble();
     if (tab === 'full-corners' && !cornerScramble.length && scramblerReady) newCornerScramble();
     if (tab === 'full-bld'     && !bldScramble.length)   newBldScramble();
+    
+    updateScrambleVisualizerVisibility();
 }
 
 tabBtns.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
@@ -1142,6 +1290,7 @@ document.querySelectorAll('.trainer-area').forEach(area => {
                 hideFsSequence('corner');
             if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld').checked)
                 hideFsSequence('bld');
+            updateScrambleVisualizerVisibility();
         }
     }, { passive: false });
 
@@ -1199,6 +1348,7 @@ document.querySelectorAll('.trainer-area').forEach(area => {
             e.preventDefault();
             timerState = 'RUNNING';
             setTimerColor('running');
+            updateScrambleVisualizerVisibility();
             area.classList.remove('touch-primed');
             startTime = performance.now();
             timerInterval = setInterval(() => {

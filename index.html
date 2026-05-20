@@ -333,6 +333,21 @@
     <script src="min2phase.js"></script>
     <script src="edges_scrambler.js"></script>
     <script src="script.js"></script>
+    <!-- Scramble Draw View -->
+    <div id="scramble-draw-view" class="scramble-draw-container hidden">
+        <div class="scramble-draw-grid">
+            <div class="sticker" id="sticker-0"></div>
+            <div class="sticker" id="sticker-1"></div>
+            <div class="sticker" id="sticker-2"></div>
+            <div class="sticker" id="sticker-3"></div>
+            <div class="sticker" id="sticker-4"></div>
+            <div class="sticker" id="sticker-5"></div>
+            <div class="sticker" id="sticker-6"></div>
+            <div class="sticker" id="sticker-7"></div>
+            <div class="sticker" id="sticker-8"></div>
+        </div>
+    </div>
+
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js').catch(() => {});
