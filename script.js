@@ -415,6 +415,16 @@ window.addEventListener('keydown', e => {
         }
     } else if (e.code === 'KeyZ' && e.altKey) {
         deleteLast();
+    } else if (e.code === 'Escape') {
+        if (timerState === 'PRIMED') {
+            e.preventDefault();
+            timerState = 'IDLE';
+            setTimerColor('idle');
+            if (activeTab === 'full-edges') showFsSequence('edge');
+            if (activeTab === 'full-corners') showFsSequence('corner');
+            if (activeTab === 'full-bld') showFsSequence('bld');
+            updateScrambleVisualizerVisibility();
+        }
     }
 });
 
