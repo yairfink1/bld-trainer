@@ -419,6 +419,20 @@ window.addEventListener('keydown', e => {
     } else if (e.code === 'KeyZ' && e.altKey) {
         deleteLast();
     } else if (e.code === 'Escape') {
+        let closed = false;
+        if (!modal.classList.contains('hidden')) {
+            modal.classList.add('hidden');
+            closed = true;
+        }
+        if (!syncModal.classList.contains('hidden')) {
+            syncModal.classList.add('hidden');
+            closed = true;
+        }
+        if (closed) {
+            e.preventDefault();
+            return;
+        }
+
         if (timerState === 'PRIMED') {
             e.preventDefault();
             timerState = 'IDLE';
