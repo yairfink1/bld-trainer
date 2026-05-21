@@ -885,8 +885,6 @@ function updateScrambleVisualizerVisibility() {
 function newEdgeScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
-    // Push current scramble to history before replacing it
-    if (edgeScramble.length) pushScrambleHistory('edge', edgeScramble);
     const s = window.generateEdgesOnlyScramble();
     edgeScramble = s.split(' ').filter(m => m.length);
     // The new scramble becomes the head of history
@@ -900,7 +898,6 @@ function newEdgeScramble(dontResetTimer = false) {
 function newCornerScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
-    if (cornerScramble.length) pushScrambleHistory('corner', cornerScramble);
     const s = window.generateCornersOnlyScramble();
     cornerScramble = s.split(' ').filter(m => m.length);
     pushScrambleHistory('corner', cornerScramble);
@@ -916,7 +913,6 @@ document.getElementById('btn-new-scramble-corner').addEventListener('click', () 
 // ---- Full BLD scramble ----
 function newBldScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
-    if (bldScramble.length) pushScrambleHistory('bld', bldScramble);
     const len = parseInt(document.getElementById('scramble-length-bld').value) || 25;
     const s = window.generateFullScramble(len);
     bldScramble = s.split(' ').filter(m => m.length);
