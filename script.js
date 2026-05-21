@@ -378,6 +378,7 @@ window.addEventListener('keydown', e => {
 
     if (e.code === 'Space') {
         e.preventDefault();
+        if (e.repeat) return; // Ignore repeating hold-down space events
         if (timerState === 'IDLE' && !timerCooldown) {
             if (showingPrevious) navigateToCurrentScramble(); // revert to current before starting
             timerState = 'PRIMED';
