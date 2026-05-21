@@ -269,6 +269,7 @@ let edgeHistoryIndex = -1, cornerHistoryIndex = -1, bldHistoryIndex = -1;
 // showingPrevious is true whenever the history index is not at the end of the history.
 let showingPrevious = false;
 let scramblerReady = false;
+let ignoreSpaceUntilKeyUp = false;
 
 function getTimerEl() {
     switch (activeTab) {
@@ -378,6 +379,7 @@ window.addEventListener('keydown', e => {
 
     if (e.code === 'Space') {
         e.preventDefault();
+        if (ignoreSpaceUntilKeyUp) return;
         if (e.repeat) return; // Ignore repeating hold-down space events
         if (timerState === 'IDLE' && !timerCooldown) {
             if (showingPrevious) navigateToCurrentScramble(); // revert to current before starting
@@ -420,6 +422,7 @@ window.addEventListener('keydown', e => {
         if (timerState === 'PRIMED') {
             e.preventDefault();
             timerState = 'IDLE';
+            ignoreSpaceUntilKeyUp = true;
             setTimerColor('idle');
             if (activeTab === 'full-edges') showFsSequence('edge');
             if (activeTab === 'full-corners') showFsSequence('corner');
@@ -431,15 +434,18 @@ window.addEventListener('keydown', e => {
 
 window.addEventListener('keyup', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-    if (e.code === 'Space' && timerState === 'PRIMED') {
-        timerState = 'RUNNING';
-        setTimerColor('running');
-        updateScrambleVisualizerVisibility();
-        startTime = performance.now();
-        timerInterval = setInterval(() => {
-            currentTime = performance.now() - startTime;
-            updateTimerDisplay();
-        }, 10);
+    if (e.code === 'Space') {
+        ignoreSpaceUntilKeyUp = false;
+        if (timerState === 'PRIMED') {
+            timerState = 'RUNNING';
+            setTimerColor('running');
+            updateScrambleVisualizerVisibility();
+            startTime = performance.now();
+            timerInterval = setInterval(() => {
+                currentTime = performance.now() - startTime;
+                updateTimerDisplay();
+            }, 10);
+        }
     }
 });
 
