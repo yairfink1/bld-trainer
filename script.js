@@ -260,7 +260,13 @@ let lastFsEdgeExecAdded = false, lastFsCornerExecAdded = false;
 let lastFsBldFullAdded = false, lastFsBldExecAdded = false, lastFsRegularAdded = false, lastFsOhAdded = false;
 let edgeScramble = [], cornerScramble = [], bldScramble = [];
 let prevEdgeLetter = '', prevCornerLetter = '';
-let prevEdgeScramble = [], prevCornerScramble = [], prevBldScramble = [];
+// Scramble history stacks — stores past scrambles so the user can go back multiple steps.
+// Index 0 = oldest, last index = most recent. historyIndex points at what is currently shown
+// (last index means showing the latest/current scramble).
+const MAX_SCRAMBLE_HISTORY = 50;
+let edgeScrambleHistory = [], cornerScrambleHistory = [], bldScrambleHistory = [];
+let edgeHistoryIndex = -1, cornerHistoryIndex = -1, bldHistoryIndex = -1;
+// showingPrevious is true whenever the history index is not at the end of the history.
 let showingPrevious = false;
 let scramblerReady = false;
 
@@ -373,7 +379,7 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Space') {
         e.preventDefault();
         if (timerState === 'IDLE' && !timerCooldown) {
-            if (showingPrevious) togglePreviousScramble(); // revert to current before starting
+            if (showingPrevious) navigateToCurrentScramble(); // revert to current before starting
             timerState = 'PRIMED';
             setTimerColor('primed');
             currentTime = 0;
@@ -389,29 +395,23 @@ window.addEventListener('keydown', e => {
         }
     } else if (e.code === 'ArrowLeft') {
         e.preventDefault();
-        togglePreviousScramble();
+        navigateScrambleHistory(-1);
     } else if (e.code === 'ArrowRight') {
-        if (showingPrevious) {
-            togglePreviousScramble();
-        } else {
-            if (activeTab === 'edge-alg') {
-                if (edgeLetter !== '?') {
-                    const h = document.getElementById('hint-text-edge');
-                    h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
-                    h.classList.remove('hidden');
-                }
-            } else if (activeTab === 'corner-alg') {
-                if (cornerLetter !== '?') {
-                    const h = document.getElementById('hint-text-corner');
-                    h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
-                    h.classList.remove('hidden');
-                }
-            } else {
-                // "Next" logic for full solves
-                if (activeTab === 'full-edges') newEdgeScramble(false);
-                else if (activeTab === 'full-corners') newCornerScramble(false);
-                else if (activeTab === 'full-bld') newBldScramble(false);
+        if (activeTab === 'edge-alg') {
+            if (edgeLetter !== '?') {
+                const h = document.getElementById('hint-text-edge');
+                h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
+                h.classList.remove('hidden');
             }
+        } else if (activeTab === 'corner-alg') {
+            if (cornerLetter !== '?') {
+                const h = document.getElementById('hint-text-corner');
+                h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
+                h.classList.remove('hidden');
+            }
+        } else {
+            // Move forward in history, or generate a new scramble if already at the latest
+            navigateScrambleHistory(+1);
         }
     } else if (e.code === 'KeyZ' && e.altKey) {
         deleteLast();
@@ -464,7 +464,11 @@ function nextEdgeTarget() {
         edgeLetter = active[Math.floor(Math.random() * active.length)];
     }
     
-    if (showingPrevious) togglePreviousScramble();
+    if (showingPrevious) {
+        // Reset the previous-letter indicator when moving to a new target
+        showingPrevious = false;
+        document.getElementById('target-letter-edge').style.color = '';
+    }
     document.getElementById('target-letter-edge').textContent = edgeLetter;
     document.getElementById('hint-text-edge').classList.add('hidden');
 }
@@ -491,7 +495,10 @@ function nextCornerTarget() {
         cornerLetter = active[Math.floor(Math.random() * active.length)];
     }
     
-    if (showingPrevious) togglePreviousScramble();
+    if (showingPrevious) {
+        showingPrevious = false;
+        document.getElementById('target-letter-corner').style.color = '';
+    }
     document.getElementById('target-letter-corner').textContent = cornerLetter;
     document.getElementById('hint-text-corner').classList.add('hidden');
 }
@@ -865,10 +872,11 @@ function updateScrambleVisualizerVisibility() {
         box.classList.add('hidden');
     } else {
         box.classList.remove('hidden');
+        // Always use the currently displayed scramble (edgeScramble etc. is kept in sync by navigateScrambleHistory)
         let moves = [];
-        if (activeTab === 'full-edges') moves = showingPrevious ? (prevEdgeScramble.length ? prevEdgeScramble : edgeScramble) : edgeScramble;
-        else if (activeTab === 'full-corners') moves = showingPrevious ? (prevCornerScramble.length ? prevCornerScramble : cornerScramble) : cornerScramble;
-        else if (activeTab === 'full-bld') moves = showingPrevious ? (prevBldScramble.length ? prevBldScramble : bldScramble) : bldScramble;
+        if (activeTab === 'full-edges') moves = edgeScramble;
+        else if (activeTab === 'full-corners') moves = cornerScramble;
+        else if (activeTab === 'full-bld') moves = bldScramble;
         
         drawScramble(moves);
     }
@@ -877,10 +885,14 @@ function updateScrambleVisualizerVisibility() {
 function newEdgeScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
-    if (showingPrevious) togglePreviousScramble();
-    prevEdgeScramble = edgeScramble;
+    // Push current scramble to history before replacing it
+    if (edgeScramble.length) pushScrambleHistory('edge', edgeScramble);
     const s = window.generateEdgesOnlyScramble();
     edgeScramble = s.split(' ').filter(m => m.length);
+    // The new scramble becomes the head of history
+    pushScrambleHistory('edge', edgeScramble);
+    edgeHistoryIndex = edgeScrambleHistory.length - 1;
+    showingPrevious = false;
     renderScramble(edgeScramble, 'edge', dontResetTimer);
     lastFsEdgeAdded = false;
 }
@@ -888,45 +900,34 @@ function newEdgeScramble(dontResetTimer = false) {
 function newCornerScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
-    if (showingPrevious) togglePreviousScramble();
-    prevCornerScramble = cornerScramble;
+    if (cornerScramble.length) pushScrambleHistory('corner', cornerScramble);
     const s = window.generateCornersOnlyScramble();
     cornerScramble = s.split(' ').filter(m => m.length);
+    pushScrambleHistory('corner', cornerScramble);
+    cornerHistoryIndex = cornerScrambleHistory.length - 1;
+    showingPrevious = false;
     renderScramble(cornerScramble, 'corner', dontResetTimer);
     lastFsCornerAdded = false;
 }
 
-function handleNextScrambleEdge() {
-    if (showingPrevious) togglePreviousScramble();
-    else newEdgeScramble(false);
-}
-
-function handleNextScrambleCorner() {
-    if (showingPrevious) togglePreviousScramble();
-    else newCornerScramble(false);
-}
-
-document.getElementById('btn-new-scramble-edge').addEventListener('click', handleNextScrambleEdge);
-document.getElementById('btn-new-scramble-corner').addEventListener('click', handleNextScrambleCorner);
+document.getElementById('btn-new-scramble-edge').addEventListener('click', () => navigateScrambleHistory(+1));
+document.getElementById('btn-new-scramble-corner').addEventListener('click', () => navigateScrambleHistory(+1));
 
 // ---- Full BLD scramble ----
 function newBldScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
-    if (showingPrevious) togglePreviousScramble();
-    prevBldScramble = bldScramble;
+    if (bldScramble.length) pushScrambleHistory('bld', bldScramble);
     const len = parseInt(document.getElementById('scramble-length-bld').value) || 25;
     const s = window.generateFullScramble(len);
     bldScramble = s.split(' ').filter(m => m.length);
+    pushScrambleHistory('bld', bldScramble);
+    bldHistoryIndex = bldScrambleHistory.length - 1;
+    showingPrevious = false;
     renderScramble(bldScramble, 'bld', dontResetTimer);
     lastFsBldAdded = false;
 }
 
-function handleNextScrambleBld() {
-    if (showingPrevious) togglePreviousScramble();
-    else newBldScramble(false);
-}
-
-document.getElementById('btn-new-scramble-bld').addEventListener('click', handleNextScrambleBld);
+document.getElementById('btn-new-scramble-bld').addEventListener('click', () => navigateScrambleHistory(+1));
 // Generate immediately (no solver needed)
 newBldScramble();
 
@@ -1300,42 +1301,134 @@ document.querySelectorAll('.trainer-area').forEach(area => {
 });
 
 // ============================================================
-//  PREVIOUS SCRAMBLE TOGGLE
+//  SCRAMBLE HISTORY NAVIGATION
 // ============================================================
-function togglePreviousScramble() {
-    if (timerState === 'RUNNING') return;
-    showingPrevious = !showingPrevious;
-    
-    const applyBorder = (id, show) => document.getElementById(id).style.border = show ? '2px solid var(--warning)' : '';
-    const applyColor = (id, show) => document.getElementById(id).style.color = show ? 'var(--warning)' : '';
-    
-    switch (activeTab) {
-        case 'edge-alg':
-            document.getElementById('target-letter-edge').textContent = showingPrevious ? prevEdgeLetter || '?' : edgeLetter;
-            applyColor('target-letter-edge', showingPrevious && prevEdgeLetter);
-            break;
-        case 'corner-alg':
-            document.getElementById('target-letter-corner').textContent = showingPrevious ? prevCornerLetter || '?' : cornerLetter;
-            applyColor('target-letter-corner', showingPrevious && prevCornerLetter);
-            break;
-        case 'full-edges':
-            renderScramble(showingPrevious ? (prevEdgeScramble.length ? prevEdgeScramble : edgeScramble) : edgeScramble, 'edge', true);
-            applyBorder('fs-sequence-edge', showingPrevious && prevEdgeScramble.length);
-            break;
-        case 'full-corners':
-            renderScramble(showingPrevious ? (prevCornerScramble.length ? prevCornerScramble : cornerScramble) : cornerScramble, 'corner', true);
-            applyBorder('fs-sequence-corner', showingPrevious && prevCornerScramble.length);
-            break;
-        case 'full-bld':
-            renderScramble(showingPrevious ? (prevBldScramble.length ? prevBldScramble : bldScramble) : bldScramble, 'bld', true);
-            applyBorder('fs-sequence-bld', showingPrevious && prevBldScramble.length);
-            break;
+
+// Push a scramble into the given history stack, capping to MAX_SCRAMBLE_HISTORY.
+function pushScrambleHistory(type, scramble) {
+    if (type === 'edge') {
+        edgeScrambleHistory.push(scramble.slice());
+        if (edgeScrambleHistory.length > MAX_SCRAMBLE_HISTORY) edgeScrambleHistory.shift();
+    } else if (type === 'corner') {
+        cornerScrambleHistory.push(scramble.slice());
+        if (cornerScrambleHistory.length > MAX_SCRAMBLE_HISTORY) cornerScrambleHistory.shift();
+    } else if (type === 'bld') {
+        bldScrambleHistory.push(scramble.slice());
+        if (bldScrambleHistory.length > MAX_SCRAMBLE_HISTORY) bldScrambleHistory.shift();
     }
 }
 
-// Setup prev buttons
+// Navigate through scramble history for the full-solve tabs.
+// direction: -1 = go back (older), +1 = go forward (newer/generate new).
+function navigateScrambleHistory(direction) {
+    if (timerState === 'RUNNING') return;
+
+    const applyBorder = (id, show) => document.getElementById(id).style.border = show ? '2px solid var(--warning)' : '';
+    const applyColor  = (id, show) => document.getElementById(id).style.color  = show ? 'var(--warning)' : '';
+
+    // For alg tabs, left/right have different semantics (letter navigation handled elsewhere).
+    // For full-solve tabs, navigate or generate.
+    if (activeTab === 'edge-alg') {
+        // Show prev letter — keep existing single-step behavior
+        if (direction === -1) {
+            showingPrevious = !showingPrevious;
+            document.getElementById('target-letter-edge').textContent = showingPrevious ? prevEdgeLetter || '?' : edgeLetter;
+            applyColor('target-letter-edge', showingPrevious && prevEdgeLetter);
+        }
+        return;
+    }
+    if (activeTab === 'corner-alg') {
+        if (direction === -1) {
+            showingPrevious = !showingPrevious;
+            document.getElementById('target-letter-corner').textContent = showingPrevious ? prevCornerLetter || '?' : cornerLetter;
+            applyColor('target-letter-corner', showingPrevious && prevCornerLetter);
+        }
+        return;
+    }
+
+    // Full-solve tabs: navigate the history stack.
+    let history, historyIndex, setIndex, type, currentScramble;
+    if (activeTab === 'full-edges') {
+        history = edgeScrambleHistory; historyIndex = edgeHistoryIndex; type = 'edge';
+        setIndex = i => { edgeHistoryIndex = i; };
+        currentScramble = edgeScramble;
+    } else if (activeTab === 'full-corners') {
+        history = cornerScrambleHistory; historyIndex = cornerHistoryIndex; type = 'corner';
+        setIndex = i => { cornerHistoryIndex = i; };
+        currentScramble = cornerScramble;
+    } else if (activeTab === 'full-bld') {
+        history = bldScrambleHistory; historyIndex = bldHistoryIndex; type = 'bld';
+        setIndex = i => { bldHistoryIndex = i; };
+        currentScramble = bldScramble;
+    } else {
+        return;
+    }
+
+    const newIndex = historyIndex + direction;
+
+    if (direction === -1) {
+        // Going backwards — show older scramble if available
+        if (newIndex < 0 || history.length === 0) return; // Already at oldest
+        setIndex(newIndex);
+        const target = history[newIndex];
+        // Update the active scramble variable so the visualizer stays in sync
+        if (activeTab === 'full-edges')   edgeScramble   = target;
+        else if (activeTab === 'full-corners') cornerScramble = target;
+        else if (activeTab === 'full-bld')     bldScramble    = target;
+        showingPrevious = (newIndex < history.length - 1);
+        renderScramble(target, type, true);
+        const seqId = 'fs-sequence-' + type;
+        applyBorder(seqId, showingPrevious);
+    } else {
+        // Going forward
+        if (newIndex < history.length) {
+            // Still within recorded history — move forward
+            setIndex(newIndex);
+            const target = history[newIndex];
+            if (activeTab === 'full-edges')   edgeScramble   = target;
+            else if (activeTab === 'full-corners') cornerScramble = target;
+            else if (activeTab === 'full-bld')     bldScramble    = target;
+            showingPrevious = (newIndex < history.length - 1);
+            renderScramble(target, type, true);
+            applyBorder('fs-sequence-' + type, showingPrevious);
+        } else {
+            // Already at the newest — generate a new scramble
+            if (type === 'edge')   newEdgeScramble(false);
+            else if (type === 'corner') newCornerScramble(false);
+            else if (type === 'bld')    newBldScramble(false);
+        }
+    }
+    updateScrambleVisualizerVisibility();
+}
+
+// Jump directly to the latest (current) scramble without toggling.
+function navigateToCurrentScramble() {
+    if (timerState === 'RUNNING') return;
+    if (!showingPrevious) return;
+    const applyBorder = (id) => document.getElementById(id).style.border = '';
+    if (activeTab === 'full-edges') {
+        edgeHistoryIndex = edgeScrambleHistory.length - 1;
+        edgeScramble = edgeScrambleHistory[edgeHistoryIndex] || edgeScramble;
+        renderScramble(edgeScramble, 'edge', true);
+        applyBorder('fs-sequence-edge');
+    } else if (activeTab === 'full-corners') {
+        cornerHistoryIndex = cornerScrambleHistory.length - 1;
+        cornerScramble = cornerScrambleHistory[cornerHistoryIndex] || cornerScramble;
+        renderScramble(cornerScramble, 'corner', true);
+        applyBorder('fs-sequence-corner');
+    } else if (activeTab === 'full-bld') {
+        bldHistoryIndex = bldScrambleHistory.length - 1;
+        bldScramble = bldScrambleHistory[bldHistoryIndex] || bldScramble;
+        renderScramble(bldScramble, 'bld', true);
+        applyBorder('fs-sequence-bld');
+    }
+    showingPrevious = false;
+    updateScrambleVisualizerVisibility();
+}
+
+// Setup prev buttons — pressing Prev button goes back one step
 document.querySelectorAll('.btn-prev-scramble').forEach(btn => {
-    btn.addEventListener('click', togglePreviousScramble);
+    btn.addEventListener('click', () => navigateScrambleHistory(-1));
 });
 
 // Re-attach remaining part of original code
