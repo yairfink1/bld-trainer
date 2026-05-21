@@ -772,8 +772,8 @@ function applyScrambleMove(state, move) {
             rotateFaceClockwise(state, 3);
             var temp = [state[24], state[25], state[26]];
             state[24] = state[42]; state[25] = state[43]; state[26] = state[44];
-            state[42] = state[53]; state[43] = state[52]; state[44] = state[51];
-            state[53] = state[15]; state[52] = state[16]; state[51] = state[17];
+            state[42] = state[51]; state[43] = state[52]; state[44] = state[53];
+            state[51] = state[15]; state[52] = state[16]; state[53] = state[17];
             state[15] = temp[0]; state[16] = temp[1]; state[17] = temp[2];
         } else if (face === 'R') {
             rotateFaceClockwise(state, 1);
