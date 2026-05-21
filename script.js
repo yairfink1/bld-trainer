@@ -1291,9 +1291,6 @@ document.querySelectorAll('.trainer-area').forEach(area => {
         }
     }, { passive: false });
 
-    document.getElementById('main-nav').addEventListener('click', e => {
-        if (e.target.tagName === 'BUTTON') switchTab(e.target.dataset.tab);
-    });
 });
 
 // ============================================================
