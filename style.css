@@ -555,18 +555,18 @@ input[type="checkbox"] {
         min-height: 72vh;
         /* Scramble at top, timer below */
         justify-content: flex-start;
-        align-items: stretch;
+        align-items: center;
     }
     .target-display { font-size: 6.5rem; }
     .timer-display { font-size: 4.5rem; }
 
-    /* Scramble — left-align, take full row width, and make it bigger! */
+    /* Scramble — center-align, take full row width, and make it bigger! */
     .fs-scramble-display { 
         font-size: 1.25rem !important; 
         line-height: 1.6 !important; 
         letter-spacing: 0.02em !important; 
         word-spacing: 0.1em !important; 
-        text-align: left !important; 
+        text-align: center !important; 
         width: 100% !important; 
     }
     .fs-scramble-display .move { 
