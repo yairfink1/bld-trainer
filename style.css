@@ -550,18 +550,20 @@ input[type="checkbox"] {
         justify-content: center;
     }
     .fs-trainer-area {
-        padding: 2rem 0.75rem;
-        gap: 1.5rem;
+        padding: 1.25rem 0.75rem 2rem;
+        gap: 1.25rem;
         min-height: 72vh;
-        justify-content: center;
+        /* Scramble at top, timer below */
+        justify-content: flex-start;
+        align-items: stretch;
     }
     .target-display { font-size: 6.5rem; }
     .timer-display { font-size: 4.5rem; }
 
-    /* Scramble — compact chips so ~25 moves fit in ~2 rows */
-    .fs-scramble-display { font-size: 0.78rem; line-height: 1.5; letter-spacing: 0; word-spacing: 0; }
-    .fs-scramble-display .move { padding: 0.05rem 0.2rem; margin: 0.1rem 0.05rem; border-radius: 0.25rem; }
-    .fs-sequence-wrap { min-height: 50px; padding: 0 0.25rem; }
+    /* Scramble — left-align so moves pack full row width, bigger font */
+    .fs-scramble-display { font-size: 0.92rem; line-height: 1.6; letter-spacing: 0; word-spacing: 0; text-align: left; }
+    .fs-scramble-display .move { padding: 0.05rem 0.22rem; margin: 0.08rem 0.04rem; border-radius: 0.25rem; }
+    .fs-sequence-wrap { min-height: 50px; padding: 0 0.1rem; width: 100%; }
 
     /* Stats */
     .fs-stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
