@@ -549,9 +549,9 @@ input[type="checkbox"] {
         min-height: 72vh;
         justify-content: center;
     }
-    .fs-trainer-area {
-        padding: 1.25rem 0.75rem 2rem;
-        gap: 1.25rem;
+    main.trainer-area.fs-trainer-area {
+        padding: 1.5rem 1rem 2rem;
+        gap: 2rem;
         min-height: 72vh;
         /* Scramble at top, timer below */
         justify-content: flex-start;
@@ -560,10 +560,26 @@ input[type="checkbox"] {
     .target-display { font-size: 6.5rem; }
     .timer-display { font-size: 4.5rem; }
 
-    /* Scramble — left-align so moves pack full row width, bigger font */
-    .fs-scramble-display { font-size: 0.92rem; line-height: 1.6; letter-spacing: 0; word-spacing: 0; text-align: left; }
-    .fs-scramble-display .move { padding: 0.05rem 0.22rem; margin: 0.08rem 0.04rem; border-radius: 0.25rem; }
-    .fs-sequence-wrap { min-height: 50px; padding: 0 0.1rem; width: 100%; }
+    /* Scramble — left-align, take full row width, and make it bigger! */
+    .fs-scramble-display { 
+        font-size: 1.2rem; 
+        line-height: 1.6; 
+        letter-spacing: 0.02em; 
+        word-spacing: 0.1em; 
+        text-align: left; 
+        width: 100%; 
+    }
+    .fs-scramble-display .move { 
+        padding: 0.12rem 0.32rem; 
+        margin: 0.15rem 0.08rem; 
+        border-radius: 0.35rem; 
+    }
+    .fs-sequence-wrap { 
+        min-height: auto; 
+        padding: 0; 
+        width: 100%; 
+        display: block; /* Disable flex centering so block-level scramble display fills 100% width and left-aligns */
+    }
 
     /* Stats */
     .fs-stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
