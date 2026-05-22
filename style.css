@@ -264,10 +264,8 @@ input[type="checkbox"] {
 .fs-sequence-wrap {
     width: 100%;
     min-height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 1rem;
+    display: block;
+    padding: 0;
 }
 
 .fs-scramble-display {
@@ -279,6 +277,7 @@ input[type="checkbox"] {
     line-height: 2;
     letter-spacing: 0.08em;
     word-spacing: 0.3em;
+    width: 100%;
 }
 
 .fs-scramble-display .move {
