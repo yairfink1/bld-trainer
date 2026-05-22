@@ -250,7 +250,7 @@ const COOLDOWN = 300;
 let timerState = 'IDLE';
 let timerCooldown = false;
 let startTime = 0, currentTime = 0, timerInterval;
-let activeTab = 'edge-alg';
+let activeTab = 'full-bld';
 
 // Per-tab state
 let edgeLetter = '', cornerLetter = '';
