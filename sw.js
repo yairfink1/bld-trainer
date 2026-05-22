@@ -3,7 +3,7 @@ const CACHE_NAME = 'bld-trainer-v20';
 const ASSETS = [
     './',
     './index.html',
-    './style.css',
+    './style.css?v=20',
     './script.js',
     './sync.js',
     './min2phase.js',

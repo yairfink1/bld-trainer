@@ -562,23 +562,23 @@ input[type="checkbox"] {
 
     /* Scramble — left-align, take full row width, and make it bigger! */
     .fs-scramble-display { 
-        font-size: 1.2rem; 
-        line-height: 1.6; 
-        letter-spacing: 0.02em; 
-        word-spacing: 0.1em; 
-        text-align: left; 
-        width: 100%; 
+        font-size: 1.25rem !important; 
+        line-height: 1.6 !important; 
+        letter-spacing: 0.02em !important; 
+        word-spacing: 0.1em !important; 
+        text-align: left !important; 
+        width: 100% !important; 
     }
     .fs-scramble-display .move { 
-        padding: 0.12rem 0.32rem; 
-        margin: 0.15rem 0.08rem; 
-        border-radius: 0.35rem; 
+        padding: 0.12rem 0.32rem !important; 
+        margin: 0.15rem 0.08rem !important; 
+        border-radius: 0.35rem !important; 
     }
     .fs-sequence-wrap { 
-        min-height: auto; 
-        padding: 0; 
-        width: 100%; 
-        display: block; /* Disable flex centering so block-level scramble display fills 100% width and left-aligns */
+        min-height: auto !important; 
+        padding: 0 !important; 
+        width: 100% !important; 
+        display: block !important; /* Disable flex centering so block-level scramble display fills 100% width and left-aligns */
     }
 
     /* Stats */
