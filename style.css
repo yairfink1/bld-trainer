@@ -539,12 +539,24 @@ input[type="checkbox"] {
     .sub-controls select { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
     .sub-controls .btn { font-size: 0.75rem; padding: 0.35rem 0.6rem; }
     .checkbox-label { font-size: 0.8rem; }
+    .tab-view { gap: 1rem; }
 
     /* Trainer area */
-    .trainer-area { padding: 2rem 1rem; gap: 1rem; border-radius: 0.75rem; }
-    .fs-trainer-area { padding: 1.5rem 0.75rem; gap: 1rem; }
-    .target-display { font-size: 5rem; }
-    .timer-display { font-size: 3.5rem; }
+    .trainer-area {
+        padding: 2.5rem 1rem;
+        gap: 1.5rem;
+        border-radius: 0.75rem;
+        min-height: 72vh;
+        justify-content: center;
+    }
+    .fs-trainer-area {
+        padding: 2rem 0.75rem;
+        gap: 1.5rem;
+        min-height: 72vh;
+        justify-content: center;
+    }
+    .target-display { font-size: 6.5rem; }
+    .timer-display { font-size: 4.5rem; }
 
     /* Scramble */
     .fs-scramble-display { font-size: 1.1rem; line-height: 1.8; letter-spacing: 0.04em; word-spacing: 0.15em; }
