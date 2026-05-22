@@ -530,9 +530,9 @@ input[type="checkbox"] {
     .controls { width: 100%; justify-content: flex-end; gap: 0.5rem; }
     .controls .btn { font-size: 0.75rem; padding: 0.4rem 0.6rem; }
 
-    /* Tabs */
-    .mode-tabs { flex-wrap: wrap; gap: 0; }
-    .tab-btn { font-size: 0.75rem; padding: 0.45rem 0.6rem; flex: 1 1 auto; text-align: center; }
+    /* Tabs — force all 5 onto a single row with equal widths */
+    .mode-tabs { display: grid; grid-template-columns: repeat(5, 1fr); flex-wrap: nowrap; gap: 0; }
+    .tab-btn { font-size: 0.72rem; padding: 0.45rem 0.2rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* Sub-controls */
     .sub-controls { gap: 0.5rem; font-size: 0.85rem; }
@@ -558,10 +558,10 @@ input[type="checkbox"] {
     .target-display { font-size: 6.5rem; }
     .timer-display { font-size: 4.5rem; }
 
-    /* Scramble */
-    .fs-scramble-display { font-size: 1.1rem; line-height: 1.8; letter-spacing: 0.04em; word-spacing: 0.15em; }
-    .fs-scramble-display .move { padding: 0.1rem 0.3rem; margin: 0.15rem 0.1rem; }
-    .fs-sequence-wrap { min-height: 60px; padding: 0 0.5rem; }
+    /* Scramble — compact chips so ~25 moves fit in ~2 rows */
+    .fs-scramble-display { font-size: 0.78rem; line-height: 1.5; letter-spacing: 0; word-spacing: 0; }
+    .fs-scramble-display .move { padding: 0.05rem 0.2rem; margin: 0.1rem 0.05rem; border-radius: 0.25rem; }
+    .fs-sequence-wrap { min-height: 50px; padding: 0 0.25rem; }
 
     /* Stats */
     .fs-stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
