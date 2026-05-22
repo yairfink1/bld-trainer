@@ -1,9 +1,9 @@
 // Service Worker for BLD Trainer — enables offline PWA
-const CACHE_NAME = 'bld-trainer-v22';
+const CACHE_NAME = 'bld-trainer-v23';
 const ASSETS = [
     './',
     './index.html',
-    './style.css?v=22',
+    './style.css?v=23',
     './script.js',
     './sync.js',
     './min2phase.js',
