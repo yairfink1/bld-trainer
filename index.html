@@ -92,6 +92,7 @@
                 <label for="practice-mode-bld-algs">Practice:</label>
                 <div style="display:flex; gap:0.5rem">
                     <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
+                    <button class="btn secondary btn-next-scramble" id="btn-next-bld-algs" title="Next / New (Right Arrow)">Next →</button>
                     <select id="practice-mode-bld-algs">
                         <option value="random">Random</option>
                         <option value="slowest">Slowest First</option>
@@ -139,6 +140,7 @@
                 <label for="practice-mode-cfop-algs">Practice:</label>
                 <div style="display:flex; gap:0.5rem">
                     <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
+                    <button class="btn secondary btn-next-scramble" id="btn-next-cfop-algs" title="Next / New (Right Arrow)">Next →</button>
                     <select id="practice-mode-cfop-algs">
                         <option value="random">Random</option>
                         <option value="slowest">Slowest First</option>
@@ -293,10 +295,6 @@
         </div>
     </div>
 
-    <script src="sync.js"></script>
-    <script src="min2phase.js"></script>
-    <script src="edges_scrambler.js"></script>
-    <script src="script.js"></script>
     <!-- Scramble Draw View -->
     <div id="scramble-draw-view" class="scramble-draw-container hidden">
         <div class="scramble-draw-grid">
@@ -311,6 +309,11 @@
             <div class="sticker" id="sticker-8"></div>
         </div>
     </div>
+
+    <script src="sync.js"></script>
+    <script src="min2phase.js"></script>
+    <script src="edges_scrambler.js"></script>
+    <script src="script.js"></script>
 
     <script>
         if ('serviceWorker' in navigator) {

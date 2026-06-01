@@ -1011,6 +1011,11 @@ function newBldScramble(dontResetTimer = false) {
 
 document.getElementById('btn-new-scramble-half').addEventListener('click', () => navigateScrambleHistory(+1));
 document.getElementById('btn-new-scramble-bld').addEventListener('click', () => navigateScrambleHistory(+1));
+document.getElementById('btn-next-bld-algs')?.addEventListener('click', () => {
+    if (bldAlgsSubMode === 'edges') nextEdgeTarget();
+    else nextCornerTarget();
+});
+document.getElementById('btn-next-cfop-algs')?.addEventListener('click', nextCfopTarget);
 
 document.getElementById('mode-toggle-bld').addEventListener('change', renderAll);
 
