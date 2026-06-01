@@ -1,8 +1,10 @@
 // ============================================================
-//  LETTER SETS
+//  LETTER SETS & CASES
 // ============================================================
 const EDGE_LETTERS   = ['A','B','C','D','E','F','G','H','I','J','L','M','N','O','P','Q','R','S','T','V','W','X'];
 const CORNER_LETTERS = ['B','C','D','F','G','H','I','J','K','L','M','N','O','P','Q','S','T','U','V','W','X'];
+const PLL_CASES      = ['Aa','Ab','E','F','Ga','Gb','Gc','Gd','H','Ja','Jb','Na','Nb','Ra','Rb','T','Ua','Ub','V','Y','Z'];
+const OLL_CASES      = Array.from({length: 57}, (_, i) => 'OLL ' + (i + 1));
 
 // ============================================================
 //  DATA
@@ -16,6 +18,14 @@ let appData = {
     cornerTimes:       {},
     cornerActive:      {},
     cornerHistory:     [],
+    ollAlgorithms:     {},
+    ollTimes:          {},
+    ollActive:         {},
+    ollHistory:        [],
+    pllAlgorithms:     {},
+    pllTimes:          {},
+    pllActive:         {},
+    pllHistory:        [],
     fullEdgeTimes:     [],
     fullEdgeExecTimes: [],
     fullCornerTimes:   [],
@@ -46,6 +56,14 @@ function loadData() {
         appData.cornerTimes      = p.cornerTimes       || {};
         appData.cornerActive     = p.cornerActive      || {};
         appData.cornerHistory    = p.cornerHistory     || [];
+        appData.ollAlgorithms    = p.ollAlgorithms     || {};
+        appData.ollTimes         = p.ollTimes          || {};
+        appData.ollActive        = p.ollActive         || {};
+        appData.ollHistory       = p.ollHistory        || [];
+        appData.pllAlgorithms    = p.pllAlgorithms     || {};
+        appData.pllTimes         = p.pllTimes          || {};
+        appData.pllActive        = p.pllActive         || {};
+        appData.pllHistory       = p.pllHistory        || [];
         appData.fullEdgeTimes    = p.fullEdgeTimes     || [];
         appData.fullEdgeExecTimes= p.fullEdgeExecTimes || [];
         appData.fullCornerTimes  = p.fullCornerTimes   || [];
@@ -55,11 +73,6 @@ function loadData() {
         appData.fullRegularTimes = p.fullRegularTimes  || [];
         appData.fullOhTimes      = p.fullOhTimes       || [];
         appData.deletedIds       = p.deletedIds        || [];
-    }
-    // Migration for the new mode naming if needed
-    if (localStorage.getItem('bldTrainerData')) {
-        const p = JSON.parse(localStorage.getItem('bldTrainerData'));
-        // If they had bld-full or bld-exec data under old names, it's already there
     }
     // Migration: if old execTimes exists, put it in fullBldExecTimes
     if (localStorage.getItem('bldTrainerData')) {
@@ -80,7 +93,9 @@ function loadData() {
     }
     initDefaults(EDGE_LETTERS, appData.edgeTimes, appData.edgeActive);
     initDefaults(CORNER_LETTERS, appData.cornerTimes, appData.cornerActive);
-    migrateIds(); // Ensure all entries have unique IDs (backwards compatible)
+    initDefaults(OLL_CASES, appData.ollTimes, appData.ollActive);
+    initDefaults(PLL_CASES, appData.pllTimes, appData.pllActive);
+    migrateIds();
 }
 
 // ============================================================
@@ -90,7 +105,6 @@ function makeId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-// Ensure every entry in a plain-number array gets an id (migration)
 function ensureIds(arr) {
     return arr.map(e => {
         if (typeof e === 'number') return { t: e, id: makeId() };
@@ -99,23 +113,24 @@ function ensureIds(arr) {
     });
 }
 
-// Migrate all time arrays after loading
 function migrateIds() {
-    // Alg times: edgeTimes/cornerTimes are objects of arrays of numbers
     EDGE_LETTERS.forEach(l => {
-        if (appData.edgeTimes[l]) {
-            appData.edgeTimes[l] = ensureIds(appData.edgeTimes[l]);
-        }
+        if (appData.edgeTimes[l]) appData.edgeTimes[l] = ensureIds(appData.edgeTimes[l]);
     });
     CORNER_LETTERS.forEach(l => {
-        if (appData.cornerTimes[l]) {
-            appData.cornerTimes[l] = ensureIds(appData.cornerTimes[l]);
-        }
+        if (appData.cornerTimes[l]) appData.cornerTimes[l] = ensureIds(appData.cornerTimes[l]);
     });
-    // History arrays
+    OLL_CASES.forEach(l => {
+        if (appData.ollTimes[l]) appData.ollTimes[l] = ensureIds(appData.ollTimes[l]);
+    });
+    PLL_CASES.forEach(l => {
+        if (appData.pllTimes[l]) appData.pllTimes[l] = ensureIds(appData.pllTimes[l]);
+    });
     appData.edgeHistory   = ensureIds(appData.edgeHistory);
     appData.cornerHistory = ensureIds(appData.cornerHistory);
-    // Full solve arrays (already objects, just need id)
+    appData.ollHistory    = ensureIds(appData.ollHistory || []);
+    appData.pllHistory    = ensureIds(appData.pllHistory || []);
+
     const fullArrays = [
         'fullEdgeTimes','fullEdgeExecTimes','fullCornerTimes','fullCornerExecTimes',
         'fullBldTimes','fullBldExecTimes','fullRegularTimes','fullOhTimes'
@@ -128,11 +143,9 @@ function migrateIds() {
 function saveData() {
     localStorage.setItem('bldTrainerData', JSON.stringify(appData));
     renderAll();
-    // Trigger debounced sync push
     if (typeof pushToGist === 'function') pushToGist(appData);
 }
 
-// Save locally only — used after merging remote data to avoid push loop
 function saveDataLocal() {
     localStorage.setItem('bldTrainerData', JSON.stringify(appData));
     renderAll();
@@ -141,8 +154,6 @@ function saveDataLocal() {
 // ============================================================
 //  MERGE REMOTE DATA
 // ============================================================
-
-// Helper: add IDs from an array to the tombstone list
 function tombstone(arr) {
     if (!arr) return;
     arr.forEach(e => { if (e && e.id) appData.deletedIds.push(e.id); });
@@ -150,12 +161,10 @@ function tombstone(arr) {
 
 function mergeArr(local, remote) {
     const deleted = new Set(appData.deletedIds);
-    // Filter out any local entries that have been tombstoned remotely
     const filteredLocal = local.filter(e => !deleted.has(e.id));
     const localIds = new Set(filteredLocal.map(e => e.id));
     const merged = [...filteredLocal];
     remote.forEach(e => {
-        // Only add remote entry if it's not tombstoned and not already present
         if (!deleted.has(e.id) && !localIds.has(e.id)) merged.push(e);
     });
     merged.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -163,37 +172,46 @@ function mergeArr(local, remote) {
 }
 
 function mergeRemoteData(remote) {
-    // Merge tombstones first so they take effect during array merges
     if (remote.deletedIds?.length) {
         const existing = new Set(appData.deletedIds);
         remote.deletedIds.forEach(id => { if (!existing.has(id)) appData.deletedIds.push(id); });
     }
+    
     // Alg times
     EDGE_LETTERS.forEach(l => {
-        if (remote.edgeTimes?.[l]) {
-            const rem = ensureIds(remote.edgeTimes[l]);
-            appData.edgeTimes[l] = mergeArr(appData.edgeTimes[l] || [], rem);
-        }
+        if (remote.edgeTimes?.[l]) appData.edgeTimes[l] = mergeArr(appData.edgeTimes[l] || [], ensureIds(remote.edgeTimes[l]));
     });
     CORNER_LETTERS.forEach(l => {
-        if (remote.cornerTimes?.[l]) {
-            const rem = ensureIds(remote.cornerTimes[l]);
-            appData.cornerTimes[l] = mergeArr(appData.cornerTimes[l] || [], rem);
-        }
+        if (remote.cornerTimes?.[l]) appData.cornerTimes[l] = mergeArr(appData.cornerTimes[l] || [], ensureIds(remote.cornerTimes[l]));
     });
-    // Algorithms & active (remote wins if local is empty string / default)
+    OLL_CASES.forEach(l => {
+        if (remote.ollTimes?.[l]) appData.ollTimes[l] = mergeArr(appData.ollTimes[l] || [], ensureIds(remote.ollTimes[l]));
+    });
+    PLL_CASES.forEach(l => {
+        if (remote.pllTimes?.[l]) appData.pllTimes[l] = mergeArr(appData.pllTimes[l] || [], ensureIds(remote.pllTimes[l]));
+    });
+
+    // Algorithms
     EDGE_LETTERS.forEach(l => {
-        if (!appData.edgeAlgorithms[l] && remote.edgeAlgorithms?.[l])
-            appData.edgeAlgorithms[l] = remote.edgeAlgorithms[l];
+        if (!appData.edgeAlgorithms[l] && remote.edgeAlgorithms?.[l]) appData.edgeAlgorithms[l] = remote.edgeAlgorithms[l];
     });
     CORNER_LETTERS.forEach(l => {
-        if (!appData.cornerAlgorithms[l] && remote.cornerAlgorithms?.[l])
-            appData.cornerAlgorithms[l] = remote.cornerAlgorithms[l];
+        if (!appData.cornerAlgorithms[l] && remote.cornerAlgorithms?.[l]) appData.cornerAlgorithms[l] = remote.cornerAlgorithms[l];
     });
+    OLL_CASES.forEach(l => {
+        if (!appData.ollAlgorithms[l] && remote.ollAlgorithms?.[l]) appData.ollAlgorithms[l] = remote.ollAlgorithms[l];
+    });
+    PLL_CASES.forEach(l => {
+        if (!appData.pllAlgorithms[l] && remote.pllAlgorithms?.[l]) appData.pllAlgorithms[l] = remote.pllAlgorithms[l];
+    });
+
     // History
     if (remote.edgeHistory)   appData.edgeHistory   = mergeArr(appData.edgeHistory,   ensureIds(remote.edgeHistory));
     if (remote.cornerHistory) appData.cornerHistory = mergeArr(appData.cornerHistory, ensureIds(remote.cornerHistory));
-    // Full solve arrays
+    if (remote.ollHistory)    appData.ollHistory    = mergeArr(appData.ollHistory || [], ensureIds(remote.ollHistory));
+    if (remote.pllHistory)    appData.pllHistory    = mergeArr(appData.pllHistory || [], ensureIds(remote.pllHistory));
+
+    // Full solves
     const fullArrays = [
         'fullEdgeTimes','fullEdgeExecTimes','fullCornerTimes','fullCornerExecTimes',
         'fullBldTimes','fullBldExecTimes','fullRegularTimes','fullOhTimes'
@@ -203,7 +221,6 @@ function mergeRemoteData(remote) {
     });
 }
 
-// Expose for sync.js
 window.getAppData      = () => appData;
 window.applyRemoteData  = (remote) => { mergeRemoteData(remote); saveDataLocal(); };
 window.replaceRemoteData = (remote) => { 
@@ -215,18 +232,25 @@ window.replaceRemoteData = (remote) => {
     appData.cornerAlgorithms  = appData.cornerAlgorithms || {};
     appData.cornerTimes       = appData.cornerTimes || {};
     appData.cornerActive      = appData.cornerActive || {};
+    appData.ollAlgorithms     = appData.ollAlgorithms || {};
+    appData.ollTimes          = appData.ollTimes || {};
+    appData.ollActive         = appData.ollActive || {};
+    appData.pllAlgorithms     = appData.pllAlgorithms || {};
+    appData.pllTimes          = appData.pllTimes || {};
+    appData.pllActive         = appData.pllActive || {};
     appData.deletedIds        = appData.deletedIds || [];
     initDefaults(EDGE_LETTERS, appData.edgeTimes, appData.edgeActive);
     initDefaults(CORNER_LETTERS, appData.cornerTimes, appData.cornerActive);
-    migrateIds(); // ensure any raw data is formatted
+    initDefaults(OLL_CASES, appData.ollTimes, appData.ollActive);
+    initDefaults(PLL_CASES, appData.pllTimes, appData.pllActive);
+    migrateIds();
     saveDataLocal(); 
 };
 
 // ============================================================
-//  HELPERS
+//  STATS CALCULATORS & FORMATTER
 // ============================================================
 function fmt(ms) { return (ms / 1000).toFixed(2); }
-// Extract numeric value from a time entry (supports both raw numbers and {t,id} objects)
 function tv(e) { return typeof e === 'number' ? e : (e.t ?? e.time ?? 0); }
 function calcBest(arr)  { return arr.length ? fmt(Math.min(...arr.map(tv))) : '—'; }
 function calcMean(arr)  { return arr.length ? fmt(arr.map(tv).reduce((a,b)=>a+b,0)/arr.length) : '—'; }
@@ -244,40 +268,45 @@ function makeDelBtn(handler) {
 }
 
 // ============================================================
-//  TIMER STATE
+//  TIMER STATE & SUB-MODES
 // ============================================================
 const COOLDOWN = 300;
 let timerState = 'IDLE';
 let timerCooldown = false;
 let startTime = 0, currentTime = 0, timerInterval;
-let activeTab = 'full-bld';
 
-// Per-tab state
-let edgeLetter = '', cornerLetter = '';
-let lastEdgeAdded = null, lastCornerAdded = null;
-let lastFsEdgeAdded = false, lastFsCornerAdded = false, lastFsBldAdded = false;
-let lastFsEdgeExecAdded = false, lastFsCornerExecAdded = false; 
+// Consolidated Views State
+let activeTab = 'full';
+let halfSubMode = 'edges';
+let halfSolveType = 'full';
+let bldAlgsSubMode = 'edges';
+let cfopAlgsSubMode = 'oll';
+
+// Practice Cases Target State
+let edgeLetter = '', cornerLetter = '', cfopCase = '';
+let prevEdgeLetter = '', prevCornerLetter = '', prevCfopCase = '';
+let lastEdgeAdded = null, lastCornerAdded = null, lastCfopAdded = null;
+
+// Solves Added flags (for Alt+Z undo)
+let lastFsEdgeAdded = false, lastFsEdgeExecAdded = false;
+let lastFsCornerAdded = false, lastFsCornerExecAdded = false;
 let lastFsBldFullAdded = false, lastFsBldExecAdded = false, lastFsRegularAdded = false, lastFsOhAdded = false;
+
+// Scramble details
 let edgeScramble = [], cornerScramble = [], bldScramble = [];
-let prevEdgeLetter = '', prevCornerLetter = '';
-// Scramble history stacks — stores past scrambles so the user can go back multiple steps.
-// Index 0 = oldest, last index = most recent. historyIndex points at what is currently shown
-// (last index means showing the latest/current scramble).
 const MAX_SCRAMBLE_HISTORY = 50;
 let edgeScrambleHistory = [], cornerScrambleHistory = [], bldScrambleHistory = [];
 let edgeHistoryIndex = -1, cornerHistoryIndex = -1, bldHistoryIndex = -1;
-// showingPrevious is true whenever the history index is not at the end of the history.
 let showingPrevious = false;
 let scramblerReady = false;
 let ignoreSpaceUntilKeyUp = false;
 
 function getTimerEl() {
     switch (activeTab) {
-        case 'edge-alg':     return document.getElementById('timer-edge');
-        case 'full-edges':   return document.getElementById('fs-timer-edge');
-        case 'corner-alg':   return document.getElementById('timer-corner');
-        case 'full-corners': return document.getElementById('fs-timer-corner');
-        case 'full-bld':     return document.getElementById('fs-timer-bld');
+        case 'full':      return document.getElementById('fs-timer-bld');
+        case 'half':      return document.getElementById('fs-timer-half');
+        case 'bld-algs':  return document.getElementById('timer-bld-algs');
+        case 'cfop-algs': return document.getElementById('timer-cfop-algs');
     }
 }
 
@@ -296,53 +325,64 @@ function stopTimer() {
     setTimerColor('idle');
 
     switch (activeTab) {
-        case 'edge-alg':
-            if (edgeLetter !== '?') {
-                const entry = { t: currentTime, id: makeId() };
-                appData.edgeTimes[edgeLetter].push(entry);
-                appData.edgeHistory.push({ letter: edgeLetter, t: currentTime, id: makeId() });
-                lastEdgeAdded = edgeLetter;
-                saveData();
-                nextEdgeTarget();
-            }
-            break;
-        case 'corner-alg':
-            if (cornerLetter !== '?') {
-                const entry = { t: currentTime, id: makeId() };
-                appData.cornerTimes[cornerLetter].push(entry);
-                appData.cornerHistory.push({ letter: cornerLetter, t: currentTime, id: makeId() });
-                lastCornerAdded = cornerLetter;
-                saveData();
-                nextCornerTarget();
-            }
-            break;
-        case 'full-edges':
-            const modeE = document.getElementById('mode-toggle-edge').value;
-            if (modeE === 'full') {
-                appData.fullEdgeTimes.push({ time: currentTime, sequence: edgeScramble.join(' '), id: makeId() });
-                lastFsEdgeAdded = true;
+        case 'bld-algs':
+            if (bldAlgsSubMode === 'edges') {
+                if (edgeLetter !== '?') {
+                    const entry = { t: currentTime, id: makeId() };
+                    appData.edgeTimes[edgeLetter].push(entry);
+                    appData.edgeHistory.push({ letter: edgeLetter, t: currentTime, id: makeId() });
+                    lastEdgeAdded = edgeLetter;
+                    saveData();
+                    nextEdgeTarget();
+                }
             } else {
-                appData.fullEdgeExecTimes.push({ time: currentTime, sequence: edgeScramble.join(' '), id: makeId() });
-                lastFsEdgeExecAdded = true;
+                if (cornerLetter !== '?') {
+                    const entry = { t: currentTime, id: makeId() };
+                    appData.cornerTimes[cornerLetter].push(entry);
+                    appData.cornerHistory.push({ letter: cornerLetter, t: currentTime, id: makeId() });
+                    lastCornerAdded = cornerLetter;
+                    saveData();
+                    nextCornerTarget();
+                }
             }
-            showFsSequence('edge');
-            newEdgeScramble(true);
+            break;
+        case 'cfop-algs':
+            if (cfopCase !== '?') {
+                const entry = { t: currentTime, id: makeId() };
+                const timesObj = cfopAlgsSubMode === 'oll' ? appData.ollTimes : appData.pllTimes;
+                const histArr = cfopAlgsSubMode === 'oll' ? appData.ollHistory : appData.pllHistory;
+                timesObj[cfopCase].push(entry);
+                histArr.push({ letter: cfopCase, t: currentTime, id: makeId() });
+                lastCfopAdded = cfopCase;
+                saveData();
+                nextCfopTarget();
+            }
+            break;
+        case 'half':
+            if (halfSubMode === 'edges') {
+                if (halfSolveType === 'full') {
+                    appData.fullEdgeTimes.push({ time: currentTime, sequence: edgeScramble.join(' '), id: makeId() });
+                    lastFsEdgeAdded = true;
+                } else {
+                    appData.fullEdgeExecTimes.push({ time: currentTime, sequence: edgeScramble.join(' '), id: makeId() });
+                    lastFsEdgeExecAdded = true;
+                }
+                showFsSequence('half');
+                newEdgeScramble(true);
+            } else {
+                if (halfSolveType === 'full') {
+                    appData.fullCornerTimes.push({ time: currentTime, sequence: cornerScramble.join(' '), id: makeId() });
+                    lastFsCornerAdded = true;
+                } else {
+                    appData.fullCornerExecTimes.push({ time: currentTime, sequence: cornerScramble.join(' '), id: makeId() });
+                    lastFsCornerExecAdded = true;
+                }
+                showFsSequence('half');
+                newCornerScramble(true);
+            }
             saveData();
             break;
-        case 'full-corners':
-            const modeC = document.getElementById('mode-toggle-corner').value;
-            if (modeC === 'full') {
-                appData.fullCornerTimes.push({ time: currentTime, sequence: cornerScramble.join(' '), id: makeId() });
-                lastFsCornerAdded = true;
-            } else {
-                appData.fullCornerExecTimes.push({ time: currentTime, sequence: cornerScramble.join(' '), id: makeId() });
-                lastFsCornerExecAdded = true;
-            }
-            showFsSequence('corner');
-            newCornerScramble(true);
-            saveData();
-            break;
-        case 'full-bld':
+        case 'full':
             const modeB = document.getElementById('mode-toggle-bld').value;
             if (modeB === 'bld-full') {
                 appData.fullBldTimes.push({ time: currentTime, sequence: bldScramble.join(' '), id: makeId() });
@@ -366,7 +406,7 @@ function stopTimer() {
 }
 
 // ============================================================
-//  KEYBOARD
+//  KEYBOARD WORKFLOWS
 // ============================================================
 window.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
@@ -380,19 +420,17 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Space') {
         e.preventDefault();
         if (ignoreSpaceUntilKeyUp) return;
-        if (e.repeat) return; // Ignore repeating hold-down space events
+        if (e.repeat) return;
         if (timerState === 'IDLE' && !timerCooldown) {
-            if (showingPrevious) navigateToCurrentScramble(); // revert to current before starting
+            if (showingPrevious) navigateToCurrentScramble();
             timerState = 'PRIMED';
             setTimerColor('primed');
             currentTime = 0;
             updateTimerDisplay();
-            // Hide scramble if applicable
-            if (activeTab === 'full-edges' && document.getElementById('hide-on-start-edge').checked)
-                hideFsSequence('edge');
-            if (activeTab === 'full-corners' && document.getElementById('hide-on-start-corner').checked)
-                hideFsSequence('corner');
-            if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld').checked)
+            
+            if (activeTab === 'half' && document.getElementById('hide-on-start-half').checked)
+                hideFsSequence('half');
+            if (activeTab === 'full' && document.getElementById('hide-on-start-bld').checked)
                 hideFsSequence('bld');
             updateScrambleVisualizerVisibility();
         }
@@ -400,47 +438,40 @@ window.addEventListener('keydown', e => {
         e.preventDefault();
         navigateScrambleHistory(-1);
     } else if (e.code === 'ArrowRight') {
-        if (activeTab === 'edge-alg') {
-            if (edgeLetter !== '?') {
-                const h = document.getElementById('hint-text-edge');
+        if (activeTab === 'bld-algs') {
+            const h = document.getElementById('hint-text-bld-algs');
+            if (bldAlgsSubMode === 'edges' && edgeLetter !== '?') {
                 h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
                 h.classList.remove('hidden');
-            }
-        } else if (activeTab === 'corner-alg') {
-            if (cornerLetter !== '?') {
-                const h = document.getElementById('hint-text-corner');
+            } else if (bldAlgsSubMode === 'corners' && cornerLetter !== '?') {
                 h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
                 h.classList.remove('hidden');
             }
+        } else if (activeTab === 'cfop-algs') {
+            if (cfopCase !== '?') {
+                const h = document.getElementById('hint-text-cfop-algs');
+                const algObj = cfopAlgsSubMode === 'oll' ? appData.ollAlgorithms : appData.pllAlgorithms;
+                h.textContent = algObj[cfopCase] || 'No algorithm set.';
+                h.classList.remove('hidden');
+            }
         } else {
-            // Move forward in history, or generate a new scramble if already at the latest
             navigateScrambleHistory(+1);
         }
     } else if (e.code === 'KeyZ' && e.altKey) {
         deleteLast();
     } else if (e.code === 'Escape') {
         let closed = false;
-        if (!modal.classList.contains('hidden')) {
-            modal.classList.add('hidden');
-            closed = true;
-        }
-        if (!syncModal.classList.contains('hidden')) {
-            syncModal.classList.add('hidden');
-            closed = true;
-        }
-        if (closed) {
-            e.preventDefault();
-            return;
-        }
+        if (!modal.classList.contains('hidden')) { modal.classList.add('hidden'); closed = true; }
+        if (!syncModal.classList.contains('hidden')) { syncModal.classList.add('hidden'); closed = true; }
+        if (closed) { e.preventDefault(); return; }
 
         if (timerState === 'PRIMED') {
             e.preventDefault();
             timerState = 'IDLE';
             ignoreSpaceUntilKeyUp = true;
             setTimerColor('idle');
-            if (activeTab === 'full-edges') showFsSequence('edge');
-            if (activeTab === 'full-corners') showFsSequence('corner');
-            if (activeTab === 'full-bld') showFsSequence('bld');
+            if (activeTab === 'half') showFsSequence('half');
+            if (activeTab === 'full') showFsSequence('bld');
             updateScrambleVisualizerVisibility();
         }
     }
@@ -464,56 +495,49 @@ window.addEventListener('keyup', e => {
 });
 
 // ============================================================
-//  SINGLE ALG: EDGES
+//  PRACTICE TARGET SELECTION
 // ============================================================
 function getRawMean(times) {
-    if (!times || !times.length) return 9e9; // Empty = infinitely slow
-    const sum = times.reduce((acc, val) => acc + tv(val), 0);
-    return sum / times.length;
+    if (!times || !times.length) return 9e9;
+    return times.reduce((acc, val) => acc + tv(val), 0) / times.length;
 }
 
-// ============================================================
-//  SINGLE ALG: EDGES
-// ============================================================
 function nextEdgeTarget() {
     const active = EDGE_LETTERS.filter(l => appData.edgeActive[l]);
-    if (!active.length) { edgeLetter = '?'; document.getElementById('target-letter-edge').textContent = '?'; return; }
+    const targetEl = document.getElementById('target-letter-bld-algs');
+    if (!active.length) { edgeLetter = '?'; if (bldAlgsSubMode === 'edges' && targetEl) targetEl.textContent = '?'; return; }
     
-    prevEdgeLetter = edgeLetter; // save previous
-
-    const mode = document.getElementById('practice-mode-edge').value;
+    prevEdgeLetter = edgeLetter;
+    const mode = document.getElementById('practice-mode-bld-algs').value;
     if (mode === 'slowest' || mode === 'fastest') {
         const sorted = [...active].sort((a, b) => {
             const mA = getRawMean(appData.edgeTimes[a]);
-            const mB = getRawMean(appData.edgeTimes[b]);
+            const mB = getRawMean(appData.cornerTimes[b]);
             return mode === 'slowest' ? mB - mA : mA - mB;
         });
-        // Pick from top 3 candidates to add some variety
         const pool = sorted.slice(0, Math.min(3, sorted.length));
         edgeLetter = pool[Math.floor(Math.random() * pool.length)];
     } else {
         edgeLetter = active[Math.floor(Math.random() * active.length)];
     }
     
-    if (showingPrevious) {
-        // Reset the previous-letter indicator when moving to a new target
+    if (showingPrevious && bldAlgsSubMode === 'edges') {
         showingPrevious = false;
-        document.getElementById('target-letter-edge').style.color = '';
+        targetEl.style.color = '';
     }
-    document.getElementById('target-letter-edge').textContent = edgeLetter;
-    document.getElementById('hint-text-edge').classList.add('hidden');
+    if (bldAlgsSubMode === 'edges' && targetEl) {
+        targetEl.textContent = edgeLetter;
+        document.getElementById('hint-text-bld-algs').classList.add('hidden');
+    }
 }
 
-// ============================================================
-//  SINGLE ALG: CORNERS
-// ============================================================
 function nextCornerTarget() {
     const active = CORNER_LETTERS.filter(l => appData.cornerActive[l]);
-    if (!active.length) { cornerLetter = '?'; document.getElementById('target-letter-corner').textContent = '?'; return; }
+    const targetEl = document.getElementById('target-letter-bld-algs');
+    if (!active.length) { cornerLetter = '?'; if (bldAlgsSubMode === 'corners' && targetEl) targetEl.textContent = '?'; return; }
     
-    prevCornerLetter = cornerLetter; // save previous
-
-    const mode = document.getElementById('practice-mode-corner').value;
+    prevCornerLetter = cornerLetter;
+    const mode = document.getElementById('practice-mode-bld-algs').value;
     if (mode === 'slowest' || mode === 'fastest') {
         const sorted = [...active].sort((a, b) => {
             const mA = getRawMean(appData.cornerTimes[a]);
@@ -526,70 +550,123 @@ function nextCornerTarget() {
         cornerLetter = active[Math.floor(Math.random() * active.length)];
     }
     
+    if (showingPrevious && bldAlgsSubMode === 'corners') {
+        showingPrevious = false;
+        targetEl.style.color = '';
+    }
+    if (bldAlgsSubMode === 'corners' && targetEl) {
+        targetEl.textContent = cornerLetter;
+        document.getElementById('hint-text-bld-algs').classList.add('hidden');
+    }
+}
+
+function nextCfopTarget() {
+    const isOll = cfopAlgsSubMode === 'oll';
+    const cases = isOll ? OLL_CASES : PLL_CASES;
+    const activeObj = isOll ? appData.ollActive : appData.pllActive;
+    const timesObj = isOll ? appData.ollTimes : appData.pllTimes;
+    
+    const active = cases.filter(c => activeObj[c]);
+    const targetEl = document.getElementById('target-letter-cfop-algs');
+    if (!targetEl) return;
+    
+    if (!active.length) {
+        cfopCase = '?';
+        targetEl.textContent = '?';
+        return;
+    }
+    
+    prevCfopCase = cfopCase;
+    const mode = document.getElementById('practice-mode-cfop-algs').value;
+    if (mode === 'slowest' || mode === 'fastest') {
+        const sorted = [...active].sort((a, b) => {
+            const mA = getRawMean(timesObj[a]);
+            const mB = getRawMean(timesObj[b]);
+            return mode === 'slowest' ? mB - mA : mA - mB;
+        });
+        const pool = sorted.slice(0, Math.min(3, sorted.length));
+        cfopCase = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+        cfopCase = active[Math.floor(Math.random() * active.length)];
+    }
+    
     if (showingPrevious) {
         showingPrevious = false;
-        document.getElementById('target-letter-corner').style.color = '';
+        targetEl.style.color = '';
     }
-    document.getElementById('target-letter-corner').textContent = cornerLetter;
-    document.getElementById('hint-text-corner').classList.add('hidden');
+    targetEl.textContent = cfopCase;
+    document.getElementById('hint-text-cfop-algs').classList.add('hidden');
 }
 
 // ============================================================
-//  DELETE LAST
+//  UNDO / DELETE LAST TIME
 // ============================================================
 function deleteLast() {
     switch (activeTab) {
-        case 'edge-alg':
-            if (lastEdgeAdded && appData.edgeTimes[lastEdgeAdded]?.length) {
-                const removed = appData.edgeTimes[lastEdgeAdded].pop();
+        case 'bld-algs':
+            if (bldAlgsSubMode === 'edges') {
+                if (lastEdgeAdded && appData.edgeTimes[lastEdgeAdded]?.length) {
+                    const removed = appData.edgeTimes[lastEdgeAdded].pop();
+                    if (removed?.id) appData.deletedIds.push(removed.id);
+                    if (appData.edgeHistory.length) {
+                        const histRem = appData.edgeHistory.pop();
+                        if (histRem?.id) appData.deletedIds.push(histRem.id);
+                    }
+                    lastEdgeAdded = null;
+                    saveData(); currentTime = 0; updateTimerDisplay();
+                }
+            } else {
+                if (lastCornerAdded && appData.cornerTimes[lastCornerAdded]?.length) {
+                    const removed = appData.cornerTimes[lastCornerAdded].pop();
+                    if (removed?.id) appData.deletedIds.push(removed.id);
+                    if (appData.cornerHistory.length) {
+                        const histRem = appData.cornerHistory.pop();
+                        if (histRem?.id) appData.deletedIds.push(histRem.id);
+                    }
+                    lastCornerAdded = null;
+                    saveData(); currentTime = 0; updateTimerDisplay();
+                }
+            }
+            break;
+        case 'cfop-algs':
+            const timesObj = cfopAlgsSubMode === 'oll' ? appData.ollTimes : appData.pllTimes;
+            const histArr = cfopAlgsSubMode === 'oll' ? appData.ollHistory : appData.pllHistory;
+            if (lastCfopAdded && timesObj[lastCfopAdded]?.length) {
+                const removed = timesObj[lastCfopAdded].pop();
                 if (removed?.id) appData.deletedIds.push(removed.id);
-                if (appData.edgeHistory.length) {
-                    const histRem = appData.edgeHistory.pop();
+                if (histArr.length) {
+                    const histRem = histArr.pop();
                     if (histRem?.id) appData.deletedIds.push(histRem.id);
                 }
-                lastEdgeAdded = null;
+                lastCfopAdded = null;
                 saveData(); currentTime = 0; updateTimerDisplay();
             }
             break;
-        case 'corner-alg':
-            if (lastCornerAdded && appData.cornerTimes[lastCornerAdded]?.length) {
-                const removed = appData.cornerTimes[lastCornerAdded].pop();
-                if (removed?.id) appData.deletedIds.push(removed.id);
-                if (appData.cornerHistory.length) {
-                    const histRem = appData.cornerHistory.pop();
-                    if (histRem?.id) appData.deletedIds.push(histRem.id);
+        case 'half':
+            if (halfSubMode === 'edges') {
+                if (halfSolveType === 'full' && lastFsEdgeAdded && appData.fullEdgeTimes.length) {
+                    const removed = appData.fullEdgeTimes.pop();
+                    if (removed?.id) appData.deletedIds.push(removed.id);
+                    lastFsEdgeAdded = false;
+                } else if (halfSolveType === 'exec' && lastFsEdgeExecAdded && appData.fullEdgeExecTimes.length) {
+                    const removed = appData.fullEdgeExecTimes.pop();
+                    if (removed?.id) appData.deletedIds.push(removed.id);
+                    lastFsEdgeExecAdded = false;
                 }
-                lastCornerAdded = null;
-                saveData(); currentTime = 0; updateTimerDisplay();
-            }
-            break;
-        case 'full-edges':
-            const modeE = document.getElementById('mode-toggle-edge').value;
-            if (modeE === 'full' && lastFsEdgeAdded && appData.fullEdgeTimes.length) {
-                const removed = appData.fullEdgeTimes.pop();
-                if (removed?.id) appData.deletedIds.push(removed.id);
-                lastFsEdgeAdded = false;
-            } else if (modeE === 'exec' && lastFsEdgeExecAdded && appData.fullEdgeExecTimes.length) {
-                const removed = appData.fullEdgeExecTimes.pop();
-                if (removed?.id) appData.deletedIds.push(removed.id);
-                lastFsEdgeExecAdded = false;
+            } else {
+                if (halfSolveType === 'full' && lastFsCornerAdded && appData.fullCornerTimes.length) {
+                    const removed = appData.fullCornerTimes.pop();
+                    if (removed?.id) appData.deletedIds.push(removed.id);
+                    lastFsCornerAdded = false;
+                } else if (halfSolveType === 'exec' && lastFsCornerExecAdded && appData.fullCornerExecTimes.length) {
+                    const removed = appData.fullCornerExecTimes.pop();
+                    if (removed?.id) appData.deletedIds.push(removed.id);
+                    lastFsCornerExecAdded = false;
+                }
             }
             saveData(); currentTime = 0; updateTimerDisplay();
             break;
-        case 'full-corners':
-            const modeC = document.getElementById('mode-toggle-corner').value;
-            if (modeC === 'full' && lastFsCornerAdded && appData.fullCornerTimes.length) {
-                const removed = appData.fullCornerTimes.pop();
-                if (removed?.id) appData.deletedIds.push(removed.id);
-                lastFsCornerAdded = false;
-            } else if (modeC === 'exec' && lastFsCornerExecAdded && appData.fullCornerExecTimes.length) {
-                const removed = appData.fullCornerExecTimes.pop();
-                if (removed?.id) appData.deletedIds.push(removed.id);
-                lastFsCornerExecAdded = false;
-            }
-            saveData(); currentTime = 0; updateTimerDisplay();
-            break;
-        case 'full-bld':
+        case 'full':
             const modeB = document.getElementById('mode-toggle-bld').value;
             if (modeB === 'bld-full' && lastFsBldFullAdded && appData.fullBldTimes.length) {
                 const removed = appData.fullBldTimes.pop();
@@ -616,62 +693,19 @@ function deleteLast() {
 document.getElementById('btn-delete-last').addEventListener('click', deleteLast);
 
 // ============================================================
-//  RESET BUTTONS
-// ============================================================
-document.querySelectorAll('[data-reset]').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const type = btn.dataset.reset;
-        const msg = {
-            edge: 'Delete all edge alg times?',
-            corner: 'Delete all corner alg times?',
-            fullEdge: 'Delete all full edge solve times?',
-            fullCorner: 'Delete all full corner solve times?',
-            fullBld: 'Delete all times in this tab (BLD Full, Exec, Regular, OH)?'
-        }[type];
-        if (!confirm(msg)) return;
-        switch (type) {
-            case 'edge':
-                EDGE_LETTERS.forEach(l => { tombstone(appData.edgeTimes[l]); appData.edgeTimes[l] = []; });
-                tombstone(appData.edgeHistory); appData.edgeHistory = [];
-                break;
-            case 'corner':
-                CORNER_LETTERS.forEach(l => { tombstone(appData.cornerTimes[l]); appData.cornerTimes[l] = []; });
-                tombstone(appData.cornerHistory); appData.cornerHistory = [];
-                break;
-            case 'fullEdge':
-                tombstone(appData.fullEdgeTimes); appData.fullEdgeTimes = [];
-                tombstone(appData.fullEdgeExecTimes); appData.fullEdgeExecTimes = [];
-                break;
-            case 'fullCorner':
-                tombstone(appData.fullCornerTimes); appData.fullCornerTimes = [];
-                tombstone(appData.fullCornerExecTimes); appData.fullCornerExecTimes = [];
-                break;
-            case 'fullBld':
-                tombstone(appData.fullBldTimes); appData.fullBldTimes = [];
-                tombstone(appData.fullBldExecTimes); appData.fullBldExecTimes = [];
-                tombstone(appData.fullRegularTimes); appData.fullRegularTimes = [];
-                tombstone(appData.fullOhTimes); appData.fullOhTimes = [];
-                break;
-        }
-        saveData();
-    });
-});
-
-// ============================================================
-//  RENDER ALG TABLE (shared for edge & corner)
+//  RENDER PRACTICE TABLES
 // ============================================================
 function renderAlgTable(letters, timesObj, activeObj, algObj, tbodyId) {
     const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
     tbody.innerHTML = '';
 
-    // Calculate GLOBAL stats
     let allSolves = [];
     let allChecked = true;
     let anyChecked = false;
     letters.forEach(l => {
         if (activeObj[l]) anyChecked = true;
         else allChecked = false;
-        
         const t = timesObj[l] || [];
         t.forEach(solve => {
             allSolves.push({ val: tv(solve), id: solve.id || "0" });
@@ -700,8 +734,7 @@ function renderAlgTable(letters, timesObj, activeObj, algObj, tbodyId) {
     
     const tdAllL = document.createElement('td');
     tdAllL.className = 'letter-cell'; tdAllL.textContent = 'ALL';
-    
-    const tdAllA = document.createElement('td'); // empty alg cell
+    const tdAllA = document.createElement('td');
     
     const tdAllB = document.createElement('td'); tdAllB.className='stat-val'; tdAllB.textContent=calcBest(flatTimes);
     const tdAll5 = document.createElement('td'); tdAll5.className='stat-val'; tdAll5.textContent=calcAoN(flatTimes, 5);
@@ -742,7 +775,7 @@ function renderAlgTable(letters, timesObj, activeObj, algObj, tbodyId) {
 }
 
 // ============================================================
-//  FULL SOLVE: SCRAMBLE DISPLAY
+//  FULL SOLVE SCRAMBLING & RENDERERS
 // ============================================================
 function showFsSequence(type) {
     document.getElementById('fs-sequence-' + type).classList.remove('view-hidden');
@@ -758,6 +791,7 @@ function hideFsSequence(type) {
 
 function renderScramble(moves, type, dontResetTimer = false) {
     const el = document.getElementById('fs-sequence-' + type);
+    if (!el) return;
     el.innerHTML = '';
     moves.forEach(m => {
         const span = document.createElement('span');
@@ -772,8 +806,47 @@ function renderScramble(moves, type, dontResetTimer = false) {
     updateScrambleVisualizerVisibility();
 }
 
+function renderFsStats(timesArr, prefix, listId) {
+    const times = timesArr.map(tv);
+    document.getElementById(prefix + '-best').textContent  = calcBest(times);
+    document.getElementById(prefix + '-ao5').textContent   = calcAoN(times, 5);
+    document.getElementById(prefix + '-ao12').textContent  = calcAoN(times, 12);
+    document.getElementById(prefix + '-mean').textContent  = calcMean(times);
+    document.getElementById(prefix + '-count').textContent = times.length;
+
+    const ul = document.getElementById(listId);
+    if (!ul) return;
+    ul.innerHTML = '';
+    if (!timesArr.length) {
+        const li = document.createElement('li');
+        li.textContent = 'No solves yet.';
+        li.style.color = 'var(--text-secondary)'; li.style.justifyContent = 'center';
+        ul.appendChild(li);
+        return;
+    }
+    [...timesArr].reverse().forEach((solve, revIdx) => {
+        const realIdx = timesArr.length - 1 - revIdx;
+        const li = document.createElement('li');
+
+        const left = document.createElement('span');
+        left.style.display = 'flex'; left.style.alignItems = 'center'; left.style.gap = '0.5rem';
+        const ts = document.createElement('span'); ts.textContent = fmt(tv(solve));
+        const meta = document.createElement('span');
+        meta.className = 'solve-meta'; meta.textContent = solve.sequence || '';
+        left.appendChild(ts); left.appendChild(meta);
+
+        li.appendChild(left);
+        li.appendChild(makeDelBtn(() => {
+            if (solve.id) appData.deletedIds.push(solve.id);
+            timesArr.splice(realIdx, 1);
+            saveData();
+        }));
+        ul.appendChild(li);
+    });
+}
+
 // ============================================================
-//  3x3 SCRAMBLE VISUALIZER SIMULATOR
+//  ROTATOR & SCRAMBLE DRAWER (floating cube simulation)
 // ============================================================
 function rotateFaceClockwise(state, faceIndex) {
     var offset = faceIndex * 9;
@@ -792,11 +865,8 @@ function applyScrambleMove(state, move) {
     var face = move[0];
     var suffix = move.substring(1);
     var count = 1;
-    if (suffix === "'") {
-        count = 3;
-    } else if (suffix === "2") {
-        count = 2;
-    }
+    if (suffix === "'") count = 3;
+    else if (suffix === "2") count = 2;
 
     for (var step = 0; step < count; step++) {
         if (face === 'U') {
@@ -846,8 +916,6 @@ function applyScrambleMove(state, move) {
 }
 
 function drawScramble(moves) {
-    // Solve state: 6 faces x 9 stickers
-    // Faces: 0=U, 1=R, 2=F, 3=D, 4=L, 5=B
     var state = [];
     var faceLetters = ['U', 'R', 'F', 'D', 'L', 'B'];
     for (var f = 0; f < 6; f++) {
@@ -855,15 +923,11 @@ function drawScramble(moves) {
             state.push(faceLetters[f]);
         }
     }
-
     if (moves && moves.length) {
         moves.forEach(function(move) {
-            if (move && move.length) {
-                applyScrambleMove(state, move);
-            }
+            if (move && move.length) applyScrambleMove(state, move);
         });
     }
-
     for (var i = 0; i < 9; i++) {
         var el = document.getElementById('sticker-' + i);
         if (el) {
@@ -871,7 +935,6 @@ function drawScramble(moves) {
             el.classList.add('color-' + state[i]);
         }
     }
-
     var container = document.getElementById('scramble-draw-view');
     if (container) {
         container.classList.remove('animate-pop');
@@ -884,17 +947,14 @@ function updateScrambleVisualizerVisibility() {
     const box = document.getElementById('scramble-draw-view');
     if (!box) return;
 
-    const isFullTab = (activeTab === 'full-edges' || activeTab === 'full-corners' || activeTab === 'full-bld');
+    const isFullTab = (activeTab === 'half' || activeTab === 'full');
     let shouldHide = !isFullTab || (timerState === 'RUNNING' || timerState === 'PRIMED');
 
     if (isFullTab) {
-        if (activeTab === 'full-edges' && document.getElementById('hide-on-start-edge')?.checked && document.getElementById('fs-sequence-edge')?.classList.contains('view-hidden')) {
+        if (activeTab === 'half' && document.getElementById('hide-on-start-half')?.checked && document.getElementById('fs-sequence-half')?.classList.contains('view-hidden')) {
             shouldHide = true;
         }
-        if (activeTab === 'full-corners' && document.getElementById('hide-on-start-corner')?.checked && document.getElementById('fs-sequence-corner')?.classList.contains('view-hidden')) {
-            shouldHide = true;
-        }
-        if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld')?.checked && document.getElementById('fs-sequence-bld')?.classList.contains('view-hidden')) {
+        if (activeTab === 'full' && document.getElementById('hide-on-start-bld')?.checked && document.getElementById('fs-sequence-bld')?.classList.contains('view-hidden')) {
             shouldHide = true;
         }
     }
@@ -903,26 +963,25 @@ function updateScrambleVisualizerVisibility() {
         box.classList.add('hidden');
     } else {
         box.classList.remove('hidden');
-        // Always use the currently displayed scramble (edgeScramble etc. is kept in sync by navigateScrambleHistory)
         let moves = [];
-        if (activeTab === 'full-edges') moves = edgeScramble;
-        else if (activeTab === 'full-corners') moves = cornerScramble;
-        else if (activeTab === 'full-bld') moves = bldScramble;
-        
+        if (activeTab === 'half') moves = (halfSubMode === 'edges') ? edgeScramble : cornerScramble;
+        else if (activeTab === 'full') moves = bldScramble;
         drawScramble(moves);
     }
 }
 
+// ============================================================
+//  SCRAMBLE HANDLERS
+// ============================================================
 function newEdgeScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     if (!scramblerReady) return;
     const s = window.generateEdgesOnlyScramble();
     edgeScramble = s.split(' ').filter(m => m.length);
-    // The new scramble becomes the head of history
     pushScrambleHistory('edge', edgeScramble);
     edgeHistoryIndex = edgeScrambleHistory.length - 1;
     showingPrevious = false;
-    renderScramble(edgeScramble, 'edge', dontResetTimer);
+    renderScramble(edgeScramble, 'half', dontResetTimer);
     lastFsEdgeAdded = false;
 }
 
@@ -934,14 +993,10 @@ function newCornerScramble(dontResetTimer = false) {
     pushScrambleHistory('corner', cornerScramble);
     cornerHistoryIndex = cornerScrambleHistory.length - 1;
     showingPrevious = false;
-    renderScramble(cornerScramble, 'corner', dontResetTimer);
+    renderScramble(cornerScramble, 'half', dontResetTimer);
     lastFsCornerAdded = false;
 }
 
-document.getElementById('btn-new-scramble-edge').addEventListener('click', () => navigateScrambleHistory(+1));
-document.getElementById('btn-new-scramble-corner').addEventListener('click', () => navigateScrambleHistory(+1));
-
-// ---- Full BLD scramble ----
 function newBldScramble(dontResetTimer = false) {
     if (timerState === 'RUNNING') return;
     const len = parseInt(document.getElementById('scramble-length-bld').value) || 25;
@@ -954,73 +1009,37 @@ function newBldScramble(dontResetTimer = false) {
     lastFsBldAdded = false;
 }
 
+document.getElementById('btn-new-scramble-half').addEventListener('click', () => navigateScrambleHistory(+1));
 document.getElementById('btn-new-scramble-bld').addEventListener('click', () => navigateScrambleHistory(+1));
-// Generate immediately (no solver needed)
-newBldScramble();
 
-
-// Toggle listeners
-document.getElementById('mode-toggle-edge').addEventListener('change', renderAll);
-document.getElementById('mode-toggle-corner').addEventListener('change', renderAll);
 document.getElementById('mode-toggle-bld').addEventListener('change', renderAll);
 
 // ============================================================
-//  RENDER FULL SOLVE STATS (shared)
-// ============================================================
-function renderFsStats(timesArr, prefix, listId) {
-    const times = timesArr.map(tv);
-    document.getElementById(prefix + '-best').textContent  = calcBest(times);
-    document.getElementById(prefix + '-ao5').textContent   = calcAoN(times, 5);
-    document.getElementById(prefix + '-ao12').textContent  = calcAoN(times, 12);
-    document.getElementById(prefix + '-mean').textContent  = calcMean(times);
-    document.getElementById(prefix + '-count').textContent = times.length;
-
-    const ul = document.getElementById(listId);
-    ul.innerHTML = '';
-    if (!timesArr.length) {
-        const li = document.createElement('li');
-        li.textContent = 'No solves yet.';
-        li.style.color = 'var(--text-secondary)'; li.style.justifyContent = 'center';
-        ul.appendChild(li);
-        return;
-    }
-    [...timesArr].reverse().forEach((solve, revIdx) => {
-        const realIdx = timesArr.length - 1 - revIdx;
-        const li = document.createElement('li');
-
-        const left = document.createElement('span');
-        left.style.display = 'flex'; left.style.alignItems = 'center'; left.style.gap = '0.5rem';
-        const ts = document.createElement('span'); ts.textContent = fmt(tv(solve));
-        const meta = document.createElement('span');
-        meta.className = 'solve-meta'; meta.textContent = solve.sequence || '';
-        left.appendChild(ts); left.appendChild(meta);
-
-        li.appendChild(left);
-        li.appendChild(makeDelBtn(() => {
-            if (solve.id) appData.deletedIds.push(solve.id);
-            timesArr.splice(realIdx, 1);
-            saveData();
-        }));
-        ul.appendChild(li);
-    });
-}
-
-// ============================================================
-//  RENDER ALL
+//  RENDER ALL VIEWS & DATA
 // ============================================================
 function renderAll() {
-    renderAlgTable(EDGE_LETTERS, appData.edgeTimes, appData.edgeActive, appData.edgeAlgorithms, 'stats-body-edge');
-    renderAlgTable(CORNER_LETTERS, appData.cornerTimes, appData.cornerActive, appData.cornerAlgorithms, 'stats-body-corner');
+    // 1. BLD Algs View
+    if (bldAlgsSubMode === 'edges') {
+        renderAlgTable(EDGE_LETTERS, appData.edgeTimes, appData.edgeActive, appData.edgeAlgorithms, 'stats-body-bld-algs');
+    } else {
+        renderAlgTable(CORNER_LETTERS, appData.cornerTimes, appData.cornerActive, appData.cornerAlgorithms, 'stats-body-bld-algs');
+    }
     
-    // Edges
-    const modeE = document.getElementById('mode-toggle-edge').value;
-    renderFsStats(modeE === 'full' ? appData.fullEdgeTimes : appData.fullEdgeExecTimes, 'fse', 'fse-times-list');
-    
-    // Corners
-    const modeC = document.getElementById('mode-toggle-corner').value;
-    renderFsStats(modeC === 'full' ? appData.fullCornerTimes : appData.fullCornerExecTimes, 'fsc', 'fsc-times-list');
-    
-    // Full Tab (Multiple Modes)
+    // 2. CFOP Algs View
+    if (cfopAlgsSubMode === 'oll') {
+        renderAlgTable(OLL_CASES, appData.ollTimes, appData.ollActive, appData.ollAlgorithms, 'stats-body-cfop-algs');
+    } else {
+        renderAlgTable(PLL_CASES, appData.pllTimes, appData.pllActive, appData.pllAlgorithms, 'stats-body-cfop-algs');
+    }
+
+    // 3. Half View
+    if (halfSubMode === 'edges') {
+        renderFsStats(halfSolveType === 'full' ? appData.fullEdgeTimes : appData.fullEdgeExecTimes, 'fsh', 'fsh-times-list');
+    } else {
+        renderFsStats(halfSolveType === 'full' ? appData.fullCornerTimes : appData.fullCornerExecTimes, 'fsh', 'fsh-times-list');
+    }
+
+    // 4. Full View
     const modeB = document.getElementById('mode-toggle-bld').value;
     const bldMap = {
         'bld-full': { data: appData.fullBldTimes, label: 'BLD Full Times' },
@@ -1034,7 +1053,7 @@ function renderAll() {
 }
 
 // ============================================================
-//  TABS
+//  TABS SWITCHER & SUB-MODES toggler
 // ============================================================
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabViews = document.querySelectorAll('.tab-view');
@@ -1046,14 +1065,182 @@ function switchTab(tab) {
     tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     tabViews.forEach(v => v.classList.toggle('view-hidden', v.id !== 'view-' + tab));
 
-    if (tab === 'full-edges'   && !edgeScramble.length   && scramblerReady) newEdgeScramble();
-    if (tab === 'full-corners' && !cornerScramble.length && scramblerReady) newCornerScramble();
-    if (tab === 'full-bld'     && !bldScramble.length)   newBldScramble();
+    if (tab === 'half' && scramblerReady) {
+        if (halfSubMode === 'edges') {
+            if (!edgeScramble.length) newEdgeScramble();
+            else renderScramble(edgeScramble, 'half');
+        } else {
+            if (!cornerScramble.length) newCornerScramble();
+            else renderScramble(cornerScramble, 'half');
+        }
+    }
+    if (tab === 'full' && !bldScramble.length) newBldScramble();
+    if (tab === 'cfop-algs') nextCfopTarget();
     
     updateScrambleVisualizerVisibility();
 }
 
 tabBtns.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+// ============================================================
+//  SUBMODE SWITCH EVENT LISTENERS
+// ============================================================
+function setupSubmodeToggles() {
+    // 1. Half view submodes
+    document.querySelectorAll('#half-submode-group .btn-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#half-submode-group .btn-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            halfSubMode = btn.dataset.submode;
+            
+            const label = (halfSubMode === 'edges') ? 
+                (halfSolveType === 'full' ? 'Full Edge Solve Times' : 'Edge Execution Times') :
+                (halfSolveType === 'full' ? 'Full Corner Solve Times' : 'Corner Execution Times');
+            document.getElementById('half-stats-heading').textContent = label;
+            
+            if (halfSubMode === 'edges') {
+                if (!edgeScramble.length && scramblerReady) newEdgeScramble();
+                else renderScramble(edgeScramble, 'half');
+            } else {
+                if (!cornerScramble.length && scramblerReady) newCornerScramble();
+                else renderScramble(cornerScramble, 'half');
+            }
+            renderAll();
+        });
+    });
+
+    const typeToggle = document.getElementById('half-type-toggle');
+    if (typeToggle) {
+        typeToggle.addEventListener('click', () => {
+            if (halfSolveType === 'full') {
+                halfSolveType = 'exec';
+                typeToggle.textContent = 'Solve Mode: Execution';
+                typeToggle.className = 'btn-single-toggle inactive-state';
+            } else {
+                halfSolveType = 'full';
+                typeToggle.textContent = 'Solve Mode: Full Solve';
+                typeToggle.className = 'btn-single-toggle active-state';
+            }
+            
+            const label = (halfSubMode === 'edges') ? 
+                (halfSolveType === 'full' ? 'Full Edge Solve Times' : 'Edge Execution Times') :
+                (halfSolveType === 'full' ? 'Full Corner Solve Times' : 'Corner Execution Times');
+            document.getElementById('half-stats-heading').textContent = label;
+            renderAll();
+        });
+    }
+
+    // 2. BLD Algs submodes
+    document.querySelectorAll('#bld-algs-submode-group .btn-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#bld-algs-submode-group .btn-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            bldAlgsSubMode = btn.dataset.submode;
+            
+            document.getElementById('bld-algs-stats-heading').textContent = (bldAlgsSubMode === 'edges') ? 'Edge Alg Stats' : 'Corner Alg Stats';
+            
+            const targetEl = document.getElementById('target-letter-bld-algs');
+            if (bldAlgsSubMode === 'edges') {
+                targetEl.textContent = edgeLetter;
+            } else {
+                targetEl.textContent = cornerLetter;
+            }
+            document.getElementById('hint-text-bld-algs').classList.add('hidden');
+            renderAll();
+        });
+    });
+
+    // 3. CFOP Algs submodes
+    document.querySelectorAll('#cfop-algs-submode-group .btn-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#cfop-algs-submode-group .btn-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            cfopAlgsSubMode = btn.dataset.submode;
+            
+            document.getElementById('cfop-algs-stats-heading').textContent = (cfopAlgsSubMode === 'oll') ? 'OLL Alg Stats' : 'PLL Alg Stats';
+            
+            nextCfopTarget();
+            renderAll();
+        });
+    });
+
+    // Resets
+    document.getElementById('btn-reset-half')?.addEventListener('click', () => {
+        if (halfSubMode === 'edges') {
+            if (confirm('Delete all Full Edge solve and Execution times?')) {
+                tombstone(appData.fullEdgeTimes); appData.fullEdgeTimes = [];
+                tombstone(appData.fullEdgeExecTimes); appData.fullEdgeExecTimes = [];
+                saveData();
+            }
+        } else {
+            if (confirm('Delete all Full Corner solve and Execution times?')) {
+                tombstone(appData.fullCornerTimes); appData.fullCornerTimes = [];
+                tombstone(appData.fullCornerExecTimes); appData.fullCornerExecTimes = [];
+                saveData();
+            }
+        }
+    });
+
+    document.getElementById('btn-reset-bld-algs')?.addEventListener('click', () => {
+        if (bldAlgsSubMode === 'edges') {
+            if (confirm('Delete all edge alg times?')) {
+                EDGE_LETTERS.forEach(l => { tombstone(appData.edgeTimes[l]); appData.edgeTimes[l] = []; });
+                tombstone(appData.edgeHistory); appData.edgeHistory = [];
+                saveData();
+            }
+        } else {
+            if (confirm('Delete all corner alg times?')) {
+                CORNER_LETTERS.forEach(l => { tombstone(appData.cornerTimes[l]); appData.cornerTimes[l] = []; });
+                tombstone(appData.cornerHistory); appData.cornerHistory = [];
+                saveData();
+            }
+        }
+    });
+
+    document.getElementById('btn-reset-cfop-algs')?.addEventListener('click', () => {
+        if (cfopAlgsSubMode === 'oll') {
+            if (confirm('Delete all OLL alg times?')) {
+                OLL_CASES.forEach(l => { tombstone(appData.ollTimes[l]); appData.ollTimes[l] = []; });
+                tombstone(appData.ollHistory); appData.ollHistory = [];
+                saveData();
+            }
+        } else {
+            if (confirm('Delete all PLL alg times?')) {
+                PLL_CASES.forEach(l => { tombstone(appData.pllTimes[l]); appData.pllTimes[l] = []; });
+                tombstone(appData.pllHistory); appData.pllHistory = [];
+                saveData();
+            }
+        }
+    });
+
+    // Hints Click Handlers
+    document.getElementById('btn-hint-bld-algs')?.addEventListener('click', () => {
+        const h = document.getElementById('hint-text-bld-algs');
+        if (bldAlgsSubMode === 'edges' && edgeLetter !== '?') {
+            h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
+            h.classList.remove('hidden');
+        } else if (bldAlgsSubMode === 'corners' && cornerLetter !== '?') {
+            h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
+            h.classList.remove('hidden');
+        }
+    });
+
+    document.getElementById('btn-hint-cfop-algs')?.addEventListener('click', () => {
+        if (cfopCase !== '?') {
+            const h = document.getElementById('hint-text-cfop-algs');
+            const algObj = cfopAlgsSubMode === 'oll' ? appData.ollAlgorithms : appData.pllAlgorithms;
+            h.textContent = algObj[cfopCase] || 'No algorithm set.';
+            h.classList.remove('hidden');
+        }
+    });
+    
+    // Practice modes changes
+    document.getElementById('practice-mode-bld-algs').addEventListener('change', () => {
+        if (bldAlgsSubMode === 'edges') nextEdgeTarget();
+        else nextCornerTarget();
+    });
+    document.getElementById('practice-mode-cfop-algs').addEventListener('change', nextCfopTarget);
+}
 
 // ============================================================
 //  MANAGE TIMES MODAL
@@ -1066,13 +1253,17 @@ const modalTimesList = document.getElementById('times-list');
 function populateModalLetters() {
     modalLetterSelect.innerHTML = '';
     const type = modalTypeSelect.value;
-    const letters = type === 'edge' ? EDGE_LETTERS : CORNER_LETTERS;
+    let cases = [];
+    if (type === 'edge') cases = EDGE_LETTERS;
+    else if (type === 'corner') cases = CORNER_LETTERS;
+    else if (type === 'oll') cases = OLL_CASES;
+    else if (type === 'pll') cases = PLL_CASES;
 
     const lastOpt = document.createElement('option');
     lastOpt.value = '__last__'; lastOpt.textContent = 'Last (All Recent)';
     modalLetterSelect.appendChild(lastOpt);
 
-    letters.forEach(l => {
+    cases.forEach(l => {
         const opt = document.createElement('option');
         opt.value = l; opt.textContent = l;
         modalLetterSelect.appendChild(opt);
@@ -1083,8 +1274,12 @@ function renderModalTimes() {
     modalTimesList.innerHTML = '';
     const type = modalTypeSelect.value;
     const sel = modalLetterSelect.value;
-    const timesObj = type === 'edge' ? appData.edgeTimes : appData.cornerTimes;
-    const histArr = type === 'edge' ? appData.edgeHistory : appData.cornerHistory;
+    
+    let timesObj, histArr;
+    if (type === 'edge') { timesObj = appData.edgeTimes; histArr = appData.edgeHistory; }
+    else if (type === 'corner') { timesObj = appData.cornerTimes; histArr = appData.cornerHistory; }
+    else if (type === 'oll') { timesObj = appData.ollTimes; histArr = appData.ollHistory; }
+    else if (type === 'pll') { timesObj = appData.pllTimes; histArr = appData.pllHistory; }
 
     if (sel === '__last__') {
         if (!histArr.length) {
@@ -1109,7 +1304,6 @@ function renderModalTimes() {
                 const letterIdx = histArr.slice(0, realIdx).filter(e => e.letter === entry.letter).length;
                 if (timesObj[entry.letter]?.[letterIdx] !== undefined) {
                     const removed = timesObj[entry.letter].splice(letterIdx, 1);
-                    // Also tombstone the corresponding time entry
                     if (removed[0]?.id) appData.deletedIds.push(removed[0].id);
                 }
                 saveData(); renderModalTimes();
@@ -1180,7 +1374,6 @@ document.getElementById('btn-sync-settings').addEventListener('click', () => {
 });
 document.getElementById('btn-close-sync').addEventListener('click', () => syncModal.classList.add('hidden'));
 
-// Connect
 document.getElementById('btn-connect-sync').addEventListener('click', async () => {
     const token = document.getElementById('sync-token-input').value;
     const errEl = document.getElementById('sync-error');
@@ -1194,17 +1387,14 @@ document.getElementById('btn-connect-sync').addEventListener('click', async () =
         errEl.classList.remove('hidden');
         return;
     }
-    // After connecting, pull remote and merge
     updateSyncIndicator('syncing');
     const remote = await pullFromGist();
     if (remote) { mergeRemoteData(remote); saveDataLocal(); }
-    // Push local data up (in case remote was empty / new gist)
     await forcePushToGist(appData);
     updateSyncIndicator('synced');
     refreshSyncModal();
 });
 
-// Force push
 document.getElementById('btn-force-push').addEventListener('click', async () => {
     const btn = document.getElementById('btn-force-push');
     btn.disabled = true; btn.textContent = 'Pushing…';
@@ -1212,7 +1402,6 @@ document.getElementById('btn-force-push').addEventListener('click', async () => 
     btn.disabled = false; btn.textContent = '↑ Force Push (Local → Cloud)';
 });
 
-// Force pull
 document.getElementById('btn-force-pull').addEventListener('click', async () => {
     if (!confirm('WARNING: This will DELETE your local data and replace it EXACTLY with what is in the cloud. Continue?')) return;
     const btn = document.getElementById('btn-force-pull');
@@ -1225,14 +1414,12 @@ document.getElementById('btn-force-pull').addEventListener('click', async () => 
     btn.disabled = false; btn.textContent = '↓ Force Pull (Cloud → Local)';
 });
 
-// Disconnect
 document.getElementById('btn-disconnect-sync').addEventListener('click', () => {
     if (!confirm('Disconnect sync? Your local data will not be deleted.')) return;
     disconnectSync();
     refreshSyncModal();
 });
 
-// Hard reload (PWA cache clearer)
 const btnHardReload = document.getElementById('btn-hard-reload');
 if (btnHardReload) {
     btnHardReload.addEventListener('click', async () => {
@@ -1248,11 +1435,12 @@ if (btnHardReload) {
 //  INIT
 // ============================================================
 loadData();
+setupSubmodeToggles();
 renderAll();
 nextEdgeTarget();
 nextCornerTarget();
+newBldScramble();
 
-// Init sync indicator + pull on startup
 if (typeof isSyncEnabled === 'function') {
     if (isSyncEnabled()) {
         updateSyncIndicator('syncing');
@@ -1268,31 +1456,22 @@ if (typeof isSyncEnabled === 'function') {
     }
 }
 
-// Init scrambler
 if (window.initScrambler) {
     window.initScrambler().then(() => {
         scramblerReady = true;
-        document.getElementById('fs-loading-edge').style.display = 'none';
-        document.getElementById('fs-loading-corner').style.display = 'none';
-        if (activeTab === 'full-edges') newEdgeScramble();
-        if (activeTab === 'full-corners') newCornerScramble();
+        document.getElementById('fs-loading-half').style.display = 'none';
+        if (activeTab === 'half') {
+            if (halfSubMode === 'edges') newEdgeScramble();
+            else newCornerScramble();
+        }
     });
 }
 
 // ============================================================
-//  TOUCH EVENTS (mobile timer)
+//  TOUCH EVENTS (mobile timer support)
 // ============================================================
-function getActiveTrainerArea() {
-    const viewId = 'view-' + activeTab;
-    const view = document.getElementById(viewId);
-    if (!view) return null;
-    return view.querySelector('.trainer-area');
-}
-
-// We attach touchstart/touchend to all trainer areas
 document.querySelectorAll('.trainer-area').forEach(area => {
     area.addEventListener('touchstart', e => {
-        // Don't interfere with buttons/selects/inputs inside the area
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' ||
             e.target.tagName === 'SELECT' || e.target.tagName === 'A') return;
 
@@ -1311,24 +1490,18 @@ document.querySelectorAll('.trainer-area').forEach(area => {
             updateTimerDisplay();
             area.classList.add('touch-primed');
 
-            // Hide scramble if applicable
-            if (activeTab === 'full-edges' && document.getElementById('hide-on-start-edge').checked)
-                hideFsSequence('edge');
-            if (activeTab === 'full-corners' && document.getElementById('hide-on-start-corner').checked)
-                hideFsSequence('corner');
-            if (activeTab === 'full-bld' && document.getElementById('hide-on-start-bld').checked)
+            if (activeTab === 'half' && document.getElementById('hide-on-start-half').checked)
+                hideFsSequence('half');
+            if (activeTab === 'full' && document.getElementById('hide-on-start-bld').checked)
                 hideFsSequence('bld');
             updateScrambleVisualizerVisibility();
         }
     }, { passive: false });
-
 });
 
 // ============================================================
 //  SCRAMBLE HISTORY NAVIGATION
 // ============================================================
-
-// Push a scramble into the given history stack, capping to MAX_SCRAMBLE_HISTORY.
 function pushScrambleHistory(type, scramble) {
     if (type === 'edge') {
         edgeScrambleHistory.push(scramble.slice());
@@ -1342,45 +1515,47 @@ function pushScrambleHistory(type, scramble) {
     }
 }
 
-// Navigate through scramble history for the full-solve tabs.
-// direction: -1 = go back (older), +1 = go forward (newer/generate new).
 function navigateScrambleHistory(direction) {
     if (timerState === 'RUNNING') return;
 
     const applyBorder = (id, show) => document.getElementById(id).style.border = show ? '2px solid var(--warning)' : '';
     const applyColor  = (id, show) => document.getElementById(id).style.color  = show ? 'var(--warning)' : '';
 
-    // For alg tabs, left/right have different semantics (letter navigation handled elsewhere).
-    // For full-solve tabs, navigate or generate.
-    if (activeTab === 'edge-alg') {
-        // Show prev letter — keep existing single-step behavior
+    if (activeTab === 'bld-algs') {
         if (direction === -1) {
             showingPrevious = !showingPrevious;
-            document.getElementById('target-letter-edge').textContent = showingPrevious ? prevEdgeLetter || '?' : edgeLetter;
-            applyColor('target-letter-edge', showingPrevious && prevEdgeLetter);
+            const targetEl = document.getElementById('target-letter-bld-algs');
+            if (bldAlgsSubMode === 'edges') {
+                targetEl.textContent = showingPrevious ? prevEdgeLetter || '?' : edgeLetter;
+                applyColor('target-letter-bld-algs', showingPrevious && prevEdgeLetter);
+            } else {
+                targetEl.textContent = showingPrevious ? prevCornerLetter || '?' : cornerLetter;
+                applyColor('target-letter-bld-algs', showingPrevious && prevCornerLetter);
+            }
         }
         return;
     }
-    if (activeTab === 'corner-alg') {
+    if (activeTab === 'cfop-algs') {
         if (direction === -1) {
             showingPrevious = !showingPrevious;
-            document.getElementById('target-letter-corner').textContent = showingPrevious ? prevCornerLetter || '?' : cornerLetter;
-            applyColor('target-letter-corner', showingPrevious && prevCornerLetter);
+            document.getElementById('target-letter-cfop-algs').textContent = showingPrevious ? prevCfopCase || '?' : cfopCase;
+            applyColor('target-letter-cfop-algs', showingPrevious && prevCfopCase);
         }
         return;
     }
 
-    // Full-solve tabs: navigate the history stack.
     let history, historyIndex, setIndex, type, currentScramble;
-    if (activeTab === 'full-edges') {
-        history = edgeScrambleHistory; historyIndex = edgeHistoryIndex; type = 'edge';
-        setIndex = i => { edgeHistoryIndex = i; };
-        currentScramble = edgeScramble;
-    } else if (activeTab === 'full-corners') {
-        history = cornerScrambleHistory; historyIndex = cornerHistoryIndex; type = 'corner';
-        setIndex = i => { cornerHistoryIndex = i; };
-        currentScramble = cornerScramble;
-    } else if (activeTab === 'full-bld') {
+    if (activeTab === 'half') {
+        if (halfSubMode === 'edges') {
+            history = edgeScrambleHistory; historyIndex = edgeHistoryIndex; type = 'half';
+            setIndex = i => { edgeHistoryIndex = i; };
+            currentScramble = edgeScramble;
+        } else {
+            history = cornerScrambleHistory; historyIndex = cornerHistoryIndex; type = 'half';
+            setIndex = i => { cornerHistoryIndex = i; };
+            currentScramble = cornerScramble;
+        }
+    } else if (activeTab === 'full') {
         history = bldScrambleHistory; historyIndex = bldHistoryIndex; type = 'bld';
         setIndex = i => { bldHistoryIndex = i; };
         currentScramble = bldScramble;
@@ -1391,56 +1566,56 @@ function navigateScrambleHistory(direction) {
     const newIndex = historyIndex + direction;
 
     if (direction === -1) {
-        // Going backwards — show older scramble if available
-        if (newIndex < 0 || history.length === 0) return; // Already at oldest
+        if (newIndex < 0 || history.length === 0) return;
         setIndex(newIndex);
         const target = history[newIndex];
-        // Update the active scramble variable so the visualizer stays in sync
-        if (activeTab === 'full-edges')   edgeScramble   = target;
-        else if (activeTab === 'full-corners') cornerScramble = target;
-        else if (activeTab === 'full-bld')     bldScramble    = target;
+        if (activeTab === 'half') {
+            if (halfSubMode === 'edges') edgeScramble = target;
+            else cornerScramble = target;
+        }
+        else if (activeTab === 'full') bldScramble = target;
         showingPrevious = (newIndex < history.length - 1);
         renderScramble(target, type, true);
-        const seqId = 'fs-sequence-' + type;
-        applyBorder(seqId, showingPrevious);
+        applyBorder('fs-sequence-' + type, showingPrevious);
     } else {
-        // Going forward
         if (newIndex < history.length) {
-            // Still within recorded history — move forward
             setIndex(newIndex);
             const target = history[newIndex];
-            if (activeTab === 'full-edges')   edgeScramble   = target;
-            else if (activeTab === 'full-corners') cornerScramble = target;
-            else if (activeTab === 'full-bld')     bldScramble    = target;
+            if (activeTab === 'half') {
+                if (halfSubMode === 'edges') edgeScramble = target;
+                else cornerScramble = target;
+            }
+            else if (activeTab === 'full') bldScramble = target;
             showingPrevious = (newIndex < history.length - 1);
             renderScramble(target, type, true);
             applyBorder('fs-sequence-' + type, showingPrevious);
         } else {
-            // Already at the newest — generate a new scramble
-            if (type === 'edge')   newEdgeScramble(false);
-            else if (type === 'corner') newCornerScramble(false);
-            else if (type === 'bld')    newBldScramble(false);
+            if (activeTab === 'half') {
+                if (halfSubMode === 'edges') newEdgeScramble(false);
+                else newCornerScramble(false);
+            }
+            else if (activeTab === 'full') newBldScramble(false);
         }
     }
     updateScrambleVisualizerVisibility();
 }
 
-// Jump directly to the latest (current) scramble without toggling.
 function navigateToCurrentScramble() {
     if (timerState === 'RUNNING') return;
     if (!showingPrevious) return;
     const applyBorder = (id) => document.getElementById(id).style.border = '';
-    if (activeTab === 'full-edges') {
-        edgeHistoryIndex = edgeScrambleHistory.length - 1;
-        edgeScramble = edgeScrambleHistory[edgeHistoryIndex] || edgeScramble;
-        renderScramble(edgeScramble, 'edge', true);
-        applyBorder('fs-sequence-edge');
-    } else if (activeTab === 'full-corners') {
-        cornerHistoryIndex = cornerScrambleHistory.length - 1;
-        cornerScramble = cornerScrambleHistory[cornerHistoryIndex] || cornerScramble;
-        renderScramble(cornerScramble, 'corner', true);
-        applyBorder('fs-sequence-corner');
-    } else if (activeTab === 'full-bld') {
+    if (activeTab === 'half') {
+        if (halfSubMode === 'edges') {
+            edgeHistoryIndex = edgeScrambleHistory.length - 1;
+            edgeScramble = edgeScrambleHistory[edgeHistoryIndex] || edgeScramble;
+            renderScramble(edgeScramble, 'half', true);
+        } else {
+            cornerHistoryIndex = cornerScrambleHistory.length - 1;
+            cornerScramble = cornerScrambleHistory[cornerHistoryIndex] || cornerScramble;
+            renderScramble(cornerScramble, 'half', true);
+        }
+        applyBorder('fs-sequence-half');
+    } else if (activeTab === 'full') {
         bldHistoryIndex = bldScrambleHistory.length - 1;
         bldScramble = bldScrambleHistory[bldHistoryIndex] || bldScramble;
         renderScramble(bldScramble, 'bld', true);
@@ -1450,12 +1625,10 @@ function navigateToCurrentScramble() {
     updateScrambleVisualizerVisibility();
 }
 
-// Setup prev buttons — pressing Prev button goes back one step
 document.querySelectorAll('.btn-prev-scramble').forEach(btn => {
     btn.addEventListener('click', () => navigateScrambleHistory(-1));
 });
 
-// Re-attach remaining part of original code
 document.querySelectorAll('.trainer-area').forEach(area => {
     area.addEventListener('touchend', e => {
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' ||
@@ -1475,24 +1648,5 @@ document.querySelectorAll('.trainer-area').forEach(area => {
         }
     }, { passive: false });
 
-    // Prevent context menu on long-press
     area.addEventListener('contextmenu', e => e.preventDefault());
-});
-
-// ============================================================
-//  MOBILE HINT BUTTONS
-// ============================================================
-document.getElementById('btn-hint-edge')?.addEventListener('click', () => {
-    if (activeTab === 'edge-alg' && edgeLetter !== '?') {
-        const h = document.getElementById('hint-text-edge');
-        h.textContent = appData.edgeAlgorithms[edgeLetter] || 'No algorithm set.';
-        h.classList.remove('hidden');
-    }
-});
-document.getElementById('btn-hint-corner')?.addEventListener('click', () => {
-    if (activeTab === 'corner-alg' && cornerLetter !== '?') {
-        const h = document.getElementById('hint-text-corner');
-        h.textContent = appData.cornerAlgorithms[cornerLetter] || 'No algorithm set.';
-        h.classList.remove('hidden');
-    }
 });

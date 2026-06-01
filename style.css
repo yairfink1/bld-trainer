@@ -125,6 +125,65 @@ select {
 .view-hidden { display: none !important; }
 .hidden { opacity: 0; pointer-events: none; }
 
+/* Segmented Control / Toggle Group */
+.toggle-group {
+    display: inline-flex;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--panel-border);
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+}
+
+.toggle-group .btn-toggle {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: 0.4rem 1.2rem;
+    border-radius: 0.35rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle-group .btn-toggle:hover {
+    color: var(--text-primary);
+}
+
+.toggle-group .btn-toggle.active {
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Single Toggle Button */
+.btn-single-toggle {
+    background: var(--panel-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--panel-border);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-single-toggle.active-state {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+.btn-single-toggle.inactive-state {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+
 /* ====== Sub-controls ====== */
 .sub-controls {
     display: flex;
@@ -529,8 +588,8 @@ input[type="checkbox"] {
     .controls { width: 100%; justify-content: flex-end; gap: 0.5rem; }
     .controls .btn { font-size: 0.75rem; padding: 0.4rem 0.6rem; }
 
-    /* Tabs — force all 5 onto a single row with equal widths */
-    .mode-tabs { display: grid; grid-template-columns: repeat(5, 1fr); flex-wrap: nowrap; gap: 0; }
+    /* Tabs — force all 4 onto a single row with equal widths */
+    .mode-tabs { display: grid; grid-template-columns: repeat(4, 1fr); flex-wrap: nowrap; gap: 0; }
     .tab-btn { font-size: 0.72rem; padding: 0.45rem 0.2rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* Sub-controls */

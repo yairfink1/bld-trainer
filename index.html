@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=24">
+    <link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
     <div class="container">
@@ -29,123 +29,37 @@
 
         <!-- Mode Tabs -->
         <div class="mode-tabs">
-            <button class="tab-btn active" data-tab="full-bld">Full</button>
-            <button class="tab-btn" data-tab="full-edges">Full Edges</button>
-            <button class="tab-btn" data-tab="full-corners">Full Corners</button>
-            <button class="tab-btn" data-tab="edge-alg">Edge Algs</button>
-            <button class="tab-btn" data-tab="corner-alg">Corner Algs</button>
+            <button class="tab-btn active" data-tab="full">Full</button>
+            <button class="tab-btn" data-tab="half">Half</button>
+            <button class="tab-btn" data-tab="bld-algs">BLD Algs</button>
+            <button class="tab-btn" data-tab="cfop-algs">CFOP Algs</button>
         </div>
 
-        <!-- ===== EDGE ALGS ===== -->
-        <div id="view-edge-alg" class="tab-view view-hidden">
+        <!-- ===== HALF ===== -->
+        <div id="view-half" class="tab-view view-hidden">
             <div class="sub-controls">
-                <label for="practice-mode-edge">Mode:</label>
-                <div style="display:flex; gap:0.5rem">
-                    <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
-                    <select id="practice-mode-edge">
-                        <option value="random">Random</option>
-                        <option value="slowest">Slowest First</option>
-                        <option value="fastest">Fastest First</option>
-                    </select>
+                <div class="toggle-group" id="half-submode-group">
+                    <button type="button" class="btn-toggle active" data-submode="edges">Edges</button>
+                    <button type="button" class="btn-toggle" data-submode="corners">Corners</button>
                 </div>
-            </div>
-            <main class="trainer-area">
-                <div class="target-display">
-                    <span id="target-letter-edge">?</span>
-                </div>
-                <div class="timer-display">
-                    <span id="timer-edge">0.00</span>
-                </div>
-                <div class="hints-area">
-                    <p id="hint-text-edge" class="hint-text hidden"></p>
-                    <small class="desktop-hint">Hold Space → release to start → any key to stop. → for hint.</small>
-                    <small class="mobile-hint">Hold timer → release to start → tap to stop.</small>
-                    <button id="btn-hint-edge" class="btn secondary mobile-hint" style="font-size:0.8rem;padding:0.3rem 0.8rem">Show Hint</button>
-                </div>
-            </main>
-            <section class="statistics-section">
-                <div class="section-header">
-                    <h2>Edge Alg Stats</h2>
-                    <button class="btn danger" data-reset="edge">Reset Edge Stats</button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr><th>Active</th><th>Letter</th><th>Algorithm</th><th>Best</th><th>Ao5</th><th>Mean</th><th>Count</th></tr>
-                        </thead>
-                        <tbody id="stats-body-edge"></tbody>
-                    </table>
-                </div>
-            </section>
-        </div>
-
-        <!-- ===== CORNER ALGS ===== -->
-        <div id="view-corner-alg" class="tab-view view-hidden">
-            <div class="sub-controls">
-                <label for="practice-mode-corner">Mode:</label>
-                <div style="display:flex; gap:0.5rem">
-                    <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
-                    <select id="practice-mode-corner">
-                        <option value="random">Random</option>
-                        <option value="slowest">Slowest First</option>
-                        <option value="fastest">Fastest First</option>
-                    </select>
-                </div>
-            </div>
-            <main class="trainer-area">
-                <div class="target-display">
-                    <span id="target-letter-corner">?</span>
-                </div>
-                <div class="timer-display">
-                    <span id="timer-corner">0.00</span>
-                </div>
-                <div class="hints-area">
-                    <p id="hint-text-corner" class="hint-text hidden"></p>
-                    <small class="desktop-hint">Hold Space → release to start → any key to stop. → for hint.</small>
-                    <small class="mobile-hint">Hold timer → release to start → tap to stop.</small>
-                    <button id="btn-hint-corner" class="btn secondary mobile-hint" style="font-size:0.8rem;padding:0.3rem 0.8rem">Show Hint</button>
-                </div>
-            </main>
-            <section class="statistics-section">
-                <div class="section-header">
-                    <h2>Corner Alg Stats</h2>
-                    <button class="btn danger" data-reset="corner">Reset Corner Stats</button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr><th>Active</th><th>Letter</th><th>Algorithm</th><th>Best</th><th>Ao5</th><th>Mean</th><th>Count</th></tr>
-                        </thead>
-                        <tbody id="stats-body-corner"></tbody>
-                    </table>
-                </div>
-            </section>
-        </div>
-
-        <!-- ===== FULL EDGES ===== -->
-        <div id="view-full-edges" class="tab-view view-hidden">
-            <div class="sub-controls">
-                <select id="mode-toggle-edge">
-                    <option value="full">Full Solve</option>
-                    <option value="exec">Execution</option>
-                </select>
+                <button type="button" id="half-type-toggle" class="btn-single-toggle active-state">Solve Mode: Full Solve</button>
                 <label class="checkbox-label">
-                    <input type="checkbox" id="hide-on-start-edge" checked>
+                    <input type="checkbox" id="hide-on-start-half" checked>
                     Hide scramble on start
                 </label>
                 <div style="display:flex; gap:0.5rem">
                     <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
-                    <button id="btn-new-scramble-edge" class="btn secondary btn-next-scramble" title="Next / New (Right Arrow)">Next →</button>
+                    <button id="btn-new-scramble-half" class="btn secondary btn-next-scramble" title="Next / New (Right Arrow)">Next →</button>
                 </div>
             </div>
             <main class="trainer-area fs-trainer-area">
                 <div class="fs-sequence-wrap">
-                    <div id="fs-sequence-edge" class="fs-scramble-display"></div>
-                    <p id="fs-loading-edge" class="fs-msg">⏳ Initialising scramble engine...</p>
-                    <p id="fs-hidden-edge" class="fs-msg hidden">Scramble hidden — execute from memory!</p>
+                    <div id="fs-sequence-half" class="fs-scramble-display"></div>
+                    <p id="fs-loading-half" class="fs-msg">⏳ Initialising scramble engine...</p>
+                    <p id="fs-hidden-half" class="fs-msg hidden">Scramble hidden — execute from memory!</p>
                 </div>
                 <div class="timer-display">
-                    <span id="fs-timer-edge">0.00</span>
+                    <span id="fs-timer-half">0.00</span>
                 </div>
                 <div class="hints-area">
                     <small class="desktop-hint">Apply scramble → memo → Hold Space → release → any key to stop.</small>
@@ -154,68 +68,116 @@
             </main>
             <section class="statistics-section">
                 <div class="section-header">
-                    <h2>Full Edge Solve Times</h2>
-                    <button class="btn danger" data-reset="fullEdge">Reset</button>
+                    <h2 id="half-stats-heading">Full Edge Solve Times</h2>
+                    <button class="btn danger" id="btn-reset-half">Reset</button>
                 </div>
                 <div class="fs-stats-grid">
-                    <div class="fs-stat-card"><div class="fs-stat-label">Best</div><div class="fs-stat-val" id="fse-best">—</div></div>
-                    <div class="fs-stat-card"><div class="fs-stat-label">Ao5</div><div class="fs-stat-val" id="fse-ao5">—</div></div>
-                    <div class="fs-stat-card"><div class="fs-stat-label">Ao12</div><div class="fs-stat-val" id="fse-ao12">—</div></div>
-                    <div class="fs-stat-card"><div class="fs-stat-label">Mean</div><div class="fs-stat-val" id="fse-mean">—</div></div>
-                    <div class="fs-stat-card"><div class="fs-stat-label">Count</div><div class="fs-stat-val" id="fse-count">0</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Best</div><div class="fs-stat-val" id="fsh-best">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Ao5</div><div class="fs-stat-val" id="fsh-ao5">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Ao12</div><div class="fs-stat-val" id="fsh-ao12">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Mean</div><div class="fs-stat-val" id="fsh-mean">—</div></div>
+                    <div class="fs-stat-card"><div class="fs-stat-label">Count</div><div class="fs-stat-val" id="fsh-count">0</div></div>
                 </div>
-                <ul id="fse-times-list" class="times-list fs-times-list"></ul>
+                <ul id="fsh-times-list" class="times-list fs-times-list"></ul>
             </section>
         </div>
 
-        <!-- ===== FULL CORNERS ===== -->
-        <div id="view-full-corners" class="tab-view view-hidden">
+        <!-- ===== BLD ALGS ===== -->
+        <div id="view-bld-algs" class="tab-view view-hidden">
             <div class="sub-controls">
-                <select id="mode-toggle-corner">
-                    <option value="full">Full Solve</option>
-                    <option value="exec">Execution</option>
-                </select>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="hide-on-start-corner" checked>
-                    Hide scramble on start
-                </label>
+                <div class="toggle-group" id="bld-algs-submode-group">
+                    <button type="button" class="btn-toggle active" data-submode="edges">Edges</button>
+                    <button type="button" class="btn-toggle" data-submode="corners">Corners</button>
+                </div>
+                <label for="practice-mode-bld-algs">Practice:</label>
                 <div style="display:flex; gap:0.5rem">
                     <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
-                    <button id="btn-new-scramble-corner" class="btn secondary btn-next-scramble" title="Next / New (Right Arrow)">Next →</button>
+                    <select id="practice-mode-bld-algs">
+                        <option value="random">Random</option>
+                        <option value="slowest">Slowest First</option>
+                        <option value="fastest">Fastest First</option>
+                    </select>
                 </div>
             </div>
-            <main class="trainer-area fs-trainer-area">
-                <div class="fs-sequence-wrap">
-                    <div id="fs-sequence-corner" class="fs-scramble-display"></div>
-                    <p id="fs-loading-corner" class="fs-msg">⏳ Initialising scramble engine...</p>
-                    <p id="fs-hidden-corner" class="fs-msg hidden">Scramble hidden — execute from memory!</p>
+            <main class="trainer-area">
+                <div class="target-display">
+                    <span id="target-letter-bld-algs">?</span>
                 </div>
                 <div class="timer-display">
-                    <span id="fs-timer-corner">0.00</span>
+                    <span id="timer-bld-algs">0.00</span>
                 </div>
                 <div class="hints-area">
-                    <small class="desktop-hint">Apply scramble → memo → Hold Space → release → any key to stop.</small>
-                    <small class="mobile-hint">Apply scramble → memo → Hold timer → release → tap to stop.</small>
+                    <p id="hint-text-bld-algs" class="hint-text hidden"></p>
+                    <small class="desktop-hint">Hold Space → release to start → any key to stop. → for hint.</small>
+                    <small class="mobile-hint">Hold timer → release to start → tap to stop.</small>
+                    <button id="btn-hint-bld-algs" class="btn secondary mobile-hint" style="font-size:0.8rem;padding:0.3rem 0.8rem">Show Hint</button>
                 </div>
             </main>
             <section class="statistics-section">
                 <div class="section-header">
-                    <h2>Full Corner Solve Times</h2>
-                    <button class="btn danger" data-reset="fullCorner">Reset</button>
+                    <h2 id="bld-algs-stats-heading">Edge Alg Stats</h2>
+                    <button class="btn danger" id="btn-reset-bld-algs">Reset Stats</button>
                 </div>
-                <div class="fs-stats-grid">
-                    <div class="fs-stat-card"><div class="fs-stat-label">Best</div><div class="fs-stat-val" id="fsc-best">—</div></div>
-                    <div class="fs-stat-card"><div class="fs-stat-label">Ao5</div><div class="fs-stat-val" id="fsc-ao5">—</div></div>
-                    <div class="fs-stat-card"><div class="fs-stat-label">Ao12</div><div class="fs-stat-val" id="fsc-ao12">—</div></div>
-                    <div class="fs-stat-card"><div class="fs-stat-label">Mean</div><div class="fs-stat-val" id="fsc-mean">—</div></div>
-                    <div class="fs-stat-card"><div class="fs-stat-label">Count</div><div class="fs-stat-val" id="fsc-count">0</div></div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Active</th><th>Letter</th><th>Algorithm</th><th>Best</th><th>Ao5</th><th>Mean</th><th>Count</th></tr>
+                        </thead>
+                        <tbody id="stats-body-bld-algs"></tbody>
+                    </table>
                 </div>
-                <ul id="fsc-times-list" class="times-list fs-times-list"></ul>
             </section>
         </div>
 
-        <!-- ===== FULL BLD ===== -->
-        <div id="view-full-bld" class="tab-view">
+        <!-- ===== CFOP ALGS ===== -->
+        <div id="view-cfop-algs" class="tab-view view-hidden">
+            <div class="sub-controls">
+                <div class="toggle-group" id="cfop-algs-submode-group">
+                    <button type="button" class="btn-toggle active" data-submode="oll">OLL</button>
+                    <button type="button" class="btn-toggle" data-submode="pll">PLL</button>
+                </div>
+                <label for="practice-mode-cfop-algs">Practice:</label>
+                <div style="display:flex; gap:0.5rem">
+                    <button class="btn secondary btn-prev-scramble" title="Show Previous (Left Arrow)">← Prev</button>
+                    <select id="practice-mode-cfop-algs">
+                        <option value="random">Random</option>
+                        <option value="slowest">Slowest First</option>
+                        <option value="fastest">Fastest First</option>
+                    </select>
+                </div>
+            </div>
+            <main class="trainer-area">
+                <div class="target-display">
+                    <span id="target-letter-cfop-algs">?</span>
+                </div>
+                <div class="timer-display">
+                    <span id="timer-cfop-algs">0.00</span>
+                </div>
+                <div class="hints-area">
+                    <p id="hint-text-cfop-algs" class="hint-text hidden"></p>
+                    <small class="desktop-hint">Hold Space → release to start → any key to stop. → for hint.</small>
+                    <small class="mobile-hint">Hold timer → release to start → tap to stop.</small>
+                    <button id="btn-hint-cfop-algs" class="btn secondary mobile-hint" style="font-size:0.8rem;padding:0.3rem 0.8rem">Show Hint</button>
+                </div>
+            </main>
+            <section class="statistics-section">
+                <div class="section-header">
+                    <h2 id="cfop-algs-stats-heading">OLL Alg Stats</h2>
+                    <button class="btn danger" id="btn-reset-cfop-algs">Reset Stats</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Active</th><th>Case</th><th>Algorithm</th><th>Best</th><th>Ao5</th><th>Mean</th><th>Count</th></tr>
+                        </thead>
+                        <tbody id="stats-body-cfop-algs"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ===== FULL ===== -->
+        <div id="view-full" class="tab-view">
             <div class="sub-controls">
                 <select id="mode-toggle-bld">
                     <option value="regular">Regular</option>
@@ -282,6 +244,8 @@
                     <select id="modal-type-select">
                         <option value="edge">Edge Algs</option>
                         <option value="corner">Corner Algs</option>
+                        <option value="oll">OLL Algs</option>
+                        <option value="pll">PLL Algs</option>
                     </select>
                     <label for="modal-letter-select">Letter:</label>
                     <select id="modal-letter-select"></select>
@@ -295,7 +259,7 @@
     <div id="sync-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>&#9881; Cloud Sync (v24)</h2>
+                <h2>&#9881; Cloud Sync (v25)</h2>
                 <button id="btn-close-sync" class="btn secondary">Close</button>
             </div>
             <div class="modal-body">
